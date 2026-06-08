@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+Pods/
+.symlinks/
+
+# Build outputs
+build/
+DerivedData/
+*.xcframework/
+
+# IDE
+.idea/
+*.xcworkspace/
+*.xcuserdata/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+# 라이브러리/플러그인 패키지는 pubspec.lock 을 커밋하지 않음 (앱(example)은 커밋 유지)
+flutter/dsrv-wallet-sdk-flutter/pubspec.lock
+
+# Android
+*.apk
+*.aab
+local.properties
+.gradle/
+.cxx/
+*.iml
+
+# Flutter 플러그인 iOS: xcframework 는 빌드 시점에 sync_ios.sh 로 canonical SDK 에서
+# 재생성(= 생성물). git 에는 두지 않는다. (*.xcframework/ 전역 무시로 이미 제외됨)
+# Mpe.xcframework 도 동일하게 재동기화되므로 무시.
+
+# Flutter 플러그인 Android: '실행 단계'에 쓰이는 산출물(Kotlin 소스 + jniLibs)은 빌드 시 sync 로
+# 채운다(git 미추적). 'config 단계'에 필요한 CMakeLists/cpp/consumer-rules 만 커밋.
+flutter/dsrv-wallet-sdk-flutter/android/src/main/kotlin/com/dsrv/wallet/sdk/
+flutter/dsrv-wallet-sdk-flutter/android/src/main/jniLibs/
+
+# React Native
+*.jsbundle
+
+# Serena
+.serena/
+
+# Claude
+.claude/
+claudedocs/
+CROSS_PLATFORM_AUDIT.md
