@@ -1,0 +1,46 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file
+local.properties
+
+# Log Files
+*.log
+
+# Android Studio
+*.iml
+.idea/
+.navigation/
+captures/
+.externalNativeBuild
+.cxx/
+
+# Keystore files
+*.jks
+*.keystore
+
+# macOS
+.DS_Store
+
+# SDK AAR — 빌드 산출물 .aar 는 무시하되, 배포용 SDK 바이너리는 커밋에 포함
+app/libs/*.aar
+!app/libs/sdk-release.aar

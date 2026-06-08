@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DSRV Wallet SDK Example</string>
+    <!-- Passkey Digital Asset Links — customer-backend 의 도메인으로 교체하세요 -->
+    <string name="asset_statements" translatable="false">
+        [{
+          \"include\": \"https://your-backend.com/.well-known/assetlinks.json\"
+        }]
+    </string>
+</resources>
