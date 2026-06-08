@@ -1,0 +1,18 @@
+# --- customer-backend (NestJS/Node) 전용 ---
+# 공통 항목(node_modules, .env, .DS_Store, build 등)은 저장소 루트 .gitignore 에서 관리
+
+# NestJS 빌드 산출물
+dist/
+
+# 테스트 커버리지
+coverage/
+.nyc_output
+
+# Node 로그
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 다른 패키지 매니저 잠금파일 (pnpm-lock.yaml 만 커밋)
+package-lock.json
+yarn.lock
