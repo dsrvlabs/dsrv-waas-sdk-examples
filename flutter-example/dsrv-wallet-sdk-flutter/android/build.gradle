@@ -1,0 +1,82 @@
+group 'com.dsrv.wallet.flutter'
+version '0.9.0'
+
+buildscript {
+    ext.kotlin_version = '2.0.21'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+// canonical Android SDK 가 있으면(개발 머신) 난독화 AAR 을 빌드해 로컬 maven repo(repo/) 로 동봉한다.
+// 소비자 환경(원본 없음)에선 이미 동봉된 repo/ 의 AAR 을 사용 → sync 는 skip.
+// maven 의존성 resolve(configuration 단계) 전에 AAR 이 있어야 하므로 여기서 실행한다.
+def canonicalSdk = file("${projectDir}/../../../android/dsrv-wallet-sdk-android/sdk")
+if (canonicalSdk.exists()) {
+    exec {
+        workingDir projectDir
+        commandLine 'bash', './sync_android.sh'
+    }
+}
+
+// 동봉한 SDK AAR 버전: canonical SDK 의 gradle.properties 우선, 없으면 repo/ 에서 탐지(소비자).
+def sdkVersion = '0.9.0'
+def sdkProps = file("${projectDir}/../../../android/dsrv-wallet-sdk-android/gradle.properties")
+if (sdkProps.exists()) {
+    def p = new Properties()
+    sdkProps.withInputStream { p.load(it) }
+    sdkVersion = p.getProperty('SDK_VERSION', sdkVersion)
+} else {
+    def repoDir = file("${projectDir}/repo/com/dsrv/wallet/sdk")
+    if (repoDir.exists()) {
+        def dirs = repoDir.listFiles().findAll { it.directory }.collect { it.name }.sort()
+        if (!dirs.isEmpty()) sdkVersion = dirs.last()
+    }
+}
+
+// 동봉한 SDK AAR 의 로컬 maven repo 를 소비 앱(rootProject)에도 등록 —
+// api 로 전파된 com.dsrv.wallet:sdk 를 app 모듈이 resolve 할 수 있게 한다.
+def sdkRepo = file("${projectDir}/repo")
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url sdkRepo.toURI() }
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.dsrv.wallet.flutter'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 24
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+
+    // DSRV Wallet SDK — 난독화 AAR (native libmpe.so 포함). api 로 소비 앱에 노출.
+    // SDK 런타임 의존성(sqlcipher/web3j/integrity 등)은 sdk-*.pom 이 transitive 로 전달.
+    api "com.dsrv.wallet:sdk:$sdkVersion"
+}

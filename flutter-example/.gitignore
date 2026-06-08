@@ -1,0 +1,9 @@
+# --- flutter-example 전용 ---
+# 공통 빌드 산출물(build/, .dart_tool/, Pods/, .symlinks/, *.xcframework/ 등)은 루트 .gitignore 에서 관리
+
+# 플러그인 pubspec.lock 은 라이브러리라 커밋하지 않음 (example 앱 것은 커밋 유지)
+dsrv-wallet-sdk-flutter/pubspec.lock
+
+# 배포용 SDK 바이너리는 커밋에 포함 (루트 .gitignore 의 *.xcframework/ 무시를 예외 처리)
+!dsrv-wallet-sdk-flutter/ios/Frameworks/dsrv_wallet_sdk_ios.xcframework
+!dsrv-wallet-sdk-flutter/ios/Frameworks/Mpe.xcframework

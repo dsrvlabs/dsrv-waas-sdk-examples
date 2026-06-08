@@ -1,0 +1,251 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+// swift-module-flags: -target arm64-apple-ios14.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -O -enable-upcoming-feature MemberImportVisibility -enable-upcoming-feature InferIsolatedConformances -enable-upcoming-feature NonisolatedNonsendingByDefault -enable-experimental-feature DebugDescriptionMacro -module-name dsrv_wallet_sdk_ios
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.2
+import AuthenticationServices
+import CryptoKit
+import DeviceCheck
+import Foundation
+import LocalAuthentication
+import Mpe
+import SQLite3
+import Security
+import Swift
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+import os
+public enum DSRVWallet {
+  public static var isInitialized: Swift.Bool {
+    get
+  }
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func initialize(sdkId: Swift.String, userCredential: dsrv_wallet_sdk_ios.UserCredential, authHandler: any dsrv_wallet_sdk_ios.AuthHandler, baseUrl: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<Swift.Void>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func createAccount(label: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.AccountResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func getAccountList() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.AccountInfo]>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func getChainList() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainInfo]>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func createAddress(accountId: Swift.String, chainType: Swift.String, label: Swift.String? = nil) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.KeyCreateResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func delegate(address: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func revoke(address: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func approve(address: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func buildTx(address: Swift.String, chainId: Swift.String, asset: dsrv_wallet_sdk_ios.TransferAsset, recipient: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxBuildResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func sign(address: Swift.String, hashedMessage: Swift.String, signId: Swift.String, messageType: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.SignResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func broadcastTx(address: Swift.String, txId: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxHashResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func transfer(address: Swift.String, chainId: Swift.String, asset: dsrv_wallet_sdk_ios.TransferAsset, recipient: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxHashResult>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func backup() async -> dsrv_wallet_sdk_ios.WalletResult<Swift.Void>
+  #endif
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func restore() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.RestoredKey]>
+  #endif
+  public static func dumpBackupForDebug() -> Swift.String
+  public static func clearBackupForDebug()
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) public static func reset() async
+  #endif
+}
+public enum CredentialType : Swift.String {
+  case userId
+  case oauthToken
+  case idpToken
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct UserCredential {
+  public let type: dsrv_wallet_sdk_ios.CredentialType
+  public let value: Swift.String
+  public let provider: Swift.String
+  public init(type: dsrv_wallet_sdk_ios.CredentialType, value: Swift.String, provider: Swift.String = "")
+}
+public struct DeviceInfo {
+  public let keyId: Swift.String?
+  public let publicKey: Swift.String?
+  public let model: Swift.String
+  public let osVersion: Swift.String
+  public let isVirtual: Swift.Bool
+  public let attestationObject: Swift.String?
+  public let platform: Swift.String
+  public init(keyId: Swift.String? = nil, publicKey: Swift.String? = nil, model: Swift.String, osVersion: Swift.String, isVirtual: Swift.Bool, attestationObject: Swift.String? = nil)
+}
+public struct ChallengeRequest {
+  public let sdkId: Swift.String
+  public let appId: Swift.String
+  public let userCredential: dsrv_wallet_sdk_ios.UserCredential
+  public let deviceInfo: dsrv_wallet_sdk_ios.DeviceInfo
+  public init(sdkId: Swift.String, appId: Swift.String, userCredential: dsrv_wallet_sdk_ios.UserCredential, deviceInfo: dsrv_wallet_sdk_ios.DeviceInfo)
+}
+public enum ChallengeResult {
+  case success(challenge: Swift.String)
+  case failure(error: Swift.String)
+}
+public protocol AuthHandler : AnyObject {
+  #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  nonisolated(nonsending) func requestChallenge(request: dsrv_wallet_sdk_ios.ChallengeRequest) async -> dsrv_wallet_sdk_ios.ChallengeResult
+  #endif
+}
+public struct KeyCreateResult {
+  public let publicKey: Swift.String
+  public let address: Swift.String
+  public init(publicKey: Swift.String, address: Swift.String)
+}
+public enum BackupStatus : Swift.String, Swift.Sendable {
+  case pending
+  case backedUp
+  case failed
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct RestoredKey {
+  public let address: Swift.String
+  public let success: Swift.Bool
+  public let error: Swift.String?
+  public init(address: Swift.String, success: Swift.Bool, error: Swift.String? = nil)
+}
+public struct TxBuildResult {
+  public let txId: Swift.String
+  public let signId: Swift.String
+  public let messageHash: Swift.String
+  public let type: Swift.String
+  public init(txId: Swift.String, signId: Swift.String, messageHash: Swift.String, type: Swift.String)
+}
+public struct SignResult {
+  public let r: Swift.String
+  public let s: Swift.String
+  public let v: Swift.Int
+  public init(r: Swift.String, s: Swift.String, v: Swift.Int)
+}
+public struct TxHashResult {
+  public let txHash: Swift.String
+  public init(txHash: Swift.String)
+}
+public struct ChainTxResult {
+  public let chainId: Swift.String
+  public let outcome: Swift.String
+  public let txHash: Swift.String?
+  public let errorMessage: Swift.String?
+  public init(chainId: Swift.String, outcome: Swift.String, txHash: Swift.String? = nil, errorMessage: Swift.String? = nil)
+  public var isSuccess: Swift.Bool {
+    get
+  }
+}
+public struct AccountResult {
+  public let accountId: Swift.String
+  public let label: Swift.String
+  public init(accountId: Swift.String, label: Swift.String)
+}
+public struct AddressInfo {
+  public let accountId: Swift.String
+  public let addressId: Swift.String
+  public let address: Swift.String
+  public let publicKey: Swift.String
+  public let label: Swift.String?
+  public let chainType: Swift.String
+  public init(accountId: Swift.String, addressId: Swift.String, address: Swift.String, publicKey: Swift.String, label: Swift.String? = nil, chainType: Swift.String)
+}
+public struct AccountInfo {
+  public let accountId: Swift.String
+  public let label: Swift.String
+  public let addresses: [dsrv_wallet_sdk_ios.AddressInfo]
+  public init(accountId: Swift.String, label: Swift.String, addresses: [dsrv_wallet_sdk_ios.AddressInfo])
+}
+public struct ChainInfo {
+  public let chainId: Swift.String
+  public let name: Swift.String
+  public let chainType: Swift.String
+  public let networkType: Swift.String
+  public init(chainId: Swift.String, name: Swift.String, chainType: Swift.String, networkType: Swift.String)
+}
+public enum TransferAsset {
+  case native
+  case erc20(tokenAddress: Swift.String)
+}
+public enum WalletError : Foundation.LocalizedError, Swift.CustomStringConvertible, Swift.Sendable {
+  case notInitialized
+  case authFailed(Swift.String)
+  case tokenExpired
+  case deviceIntegrityFailed(Swift.String)
+  case challengeFailed(Swift.String)
+  case walletNotFound
+  case keygenFailed(Swift.String)
+  case keyShareNotFound
+  case invalidPublicKey(Swift.String)
+  case walletAlreadyExists
+  case signingFailed(Swift.String)
+  case txBuildFailed(Swift.String)
+  case txBroadcastFailed(Swift.String)
+  case delegationFailed(Swift.String)
+  case approvalFailed(Swift.String)
+  case backupFailed(Swift.String)
+  case restoreFailed(Swift.String)
+  case passkeyPrfUnavailable(Swift.String)
+  case networkError(Swift.String)
+  case mpcError(Swift.String)
+  case unknown(Swift.String)
+  public var code: Swift.Int {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+  public var errorDescription: Swift.String? {
+    get
+  }
+  public static func from(_ error: any Swift.Error) -> dsrv_wallet_sdk_ios.WalletError
+}
+extension dsrv_wallet_sdk_ios.WalletResult : Swift.Sendable where T : Swift.Sendable {
+}
+@frozen public enum WalletResult<T> {
+  case success(T)
+  case failure(dsrv_wallet_sdk_ios.WalletError)
+  public var isSuccess: Swift.Bool {
+    get
+  }
+  public var isFailure: Swift.Bool {
+    get
+  }
+  public func getOrNull() -> T?
+  public func errorOrNull() -> dsrv_wallet_sdk_ios.WalletError?
+  public func getOrThrow() throws -> T
+  @discardableResult
+  public func onSuccess(_ action: (T) -> Swift.Void) -> dsrv_wallet_sdk_ios.WalletResult<T>
+  @discardableResult
+  public func onFailure(_ action: (dsrv_wallet_sdk_ios.WalletError) -> Swift.Void) -> dsrv_wallet_sdk_ios.WalletResult<T>
+  public func fold<R>(onSuccess: (T) -> R, onFailure: (dsrv_wallet_sdk_ios.WalletError) -> R) -> R
+  public func map<U>(_ transform: (T) -> U) -> dsrv_wallet_sdk_ios.WalletResult<U>
+}
+extension dsrv_wallet_sdk_ios.CredentialType : Swift.Equatable {}
+extension dsrv_wallet_sdk_ios.CredentialType : Swift.Hashable {}
+extension dsrv_wallet_sdk_ios.CredentialType : Swift.RawRepresentable {}
+extension dsrv_wallet_sdk_ios.BackupStatus : Swift.Equatable {}
+extension dsrv_wallet_sdk_ios.BackupStatus : Swift.Hashable {}
+extension dsrv_wallet_sdk_ios.BackupStatus : Swift.RawRepresentable {}

@@ -1,0 +1,22 @@
+PODS:
+  - dsrv_wallet_sdk (0.9.0):
+    - Flutter
+  - Flutter (1.0.0)
+
+DEPENDENCIES:
+  - dsrv_wallet_sdk (from `.symlinks/plugins/dsrv_wallet_sdk/ios`)
+  - Flutter (from `Flutter`)
+
+EXTERNAL SOURCES:
+  dsrv_wallet_sdk:
+    :path: ".symlinks/plugins/dsrv_wallet_sdk/ios"
+  Flutter:
+    :path: Flutter
+
+SPEC CHECKSUMS:
+  dsrv_wallet_sdk: 0913449b1aea28e6b9a939f7d657b0669f83a3eb
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+
+PODFILE CHECKSUM: 91e09b640dc9dd2f4f089f66b631cc68af4da144
+
+COCOAPODS: 1.16.2

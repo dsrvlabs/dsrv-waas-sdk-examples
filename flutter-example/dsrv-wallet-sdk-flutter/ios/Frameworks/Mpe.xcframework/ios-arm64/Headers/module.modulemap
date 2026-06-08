@@ -1,0 +1,4 @@
+module Mpe {
+  header "mpe.h"
+  export *
+}
