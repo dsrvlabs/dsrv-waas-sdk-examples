@@ -1,0 +1,13 @@
+# --- ios-example 전용 ---
+# 공통 항목(.DS_Store 등)은 저장소 루트 .gitignore 에서 관리
+
+# Xcode 빌드 산출물
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcuserdatad
+
+# 배포용 SDK 바이너리는 커밋에 포함 (루트 .gitignore 의 *.xcframework/ 무시를 예외 처리)
+!Frameworks/dsrv_wallet_sdk_ios.xcframework
+!Frameworks/Mpe.xcframework
