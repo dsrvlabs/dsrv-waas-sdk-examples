@@ -337,6 +337,13 @@
       },
       {
         "kind": "Import",
+        "name": "os",
+        "printedName": "os",
+        "declKind": "Import",
+        "moduleName": "dsrv_wallet_sdk_ios"
+      },
+      {
+        "kind": "Import",
         "name": "Foundation",
         "printedName": "Foundation",
         "declKind": "Import",
@@ -7423,9 +7430,51 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
       "kind": "StringLiteral",
-      "offset": 1397,
+      "offset": 1355,
+      "length": 21,
+      "value": "\"com.dsrv.wallet.sdk\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 1388,
+      "length": 21,
+      "value": "\"SecureEnclaveCrypto\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 1558,
       "length": 26,
       "value": "\"com.dsrv.wallet.sekek.v1\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 1845,
+      "length": 20,
+      "value": "\"dsrv_wallet_sw_key\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 1912,
+      "length": 31,
+      "value": "\"com.dsrv.wallet.encryption.sw\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 2023,
+      "length": 5,
+      "value": "\"se:\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
+      "kind": "StringLiteral",
+      "offset": 2071,
+      "length": 5,
+      "value": "\"sw:\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/Utils.swift",
