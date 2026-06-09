@@ -7421,11 +7421,11 @@
       "value": "\"POST\""
     },
     {
-      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/KeychainCrypto.swift",
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
       "kind": "StringLiteral",
-      "offset": 412,
-      "length": 17,
-      "value": "\"dsrv_wallet_key\""
+      "offset": 1397,
+      "length": 26,
+      "value": "\"com.dsrv.wallet.sekek.v1\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/Utils.swift",
