@@ -122,7 +122,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     sdkId = sdkId,
                     userCredential = userCredential,
                     authHandler = authHandler,
-                    baseUrl = dsrvApiBaseUrl
+                    baseUrl = dsrvApiBaseUrl,
+                    cloudProjectNumber = 371641890972,
                 )
 
                 if (result.isSuccess) {
@@ -660,11 +661,13 @@ class Wallet(application: Application) : AndroidViewModel(application) {
     // ===== Approve =====
 
     /**
-     * 결제 컨트랙트로의 토큰 approve(MAX) 셋업을 **지원 chain 전체**에 일괄 처리한다.
+     * 결제 컨트랙트로의 토큰 approve 셋업을 **지원 chain 전체**에 일괄 처리한다.
      * 대상 token 은 WaaS 의 `project_assets` 에 등록된 활성 ERC-20 으로 자동 결정 (client 입력 없음).
      * 위임이 사전에 설치되어 있어야 한다 ([delegate] 선행).
+     *
+     * @param amountInput "MAX" (unbounded) 또는 "0" (revoke). 비어 있으면 "MAX" 로 처리. SDK 가 uppercase 정규화.
      */
-    fun approve(addressInput: String = "") {
+    fun approve(addressInput: String = "", amountInput: String = "") {
         if (!uiState.sdkInitialized) {
             uiState = uiState.copy(approveError = "SDK 가 초기화되지 않았습니다")
             return
@@ -674,12 +677,13 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(approveError = "address 가 필요합니다 (createAddress 먼저 실행)")
             return
         }
+        val amount = amountInput.ifBlank { "MAX" }
 
         uiState = uiState.copy(approveLoading = true, approveError = null, approveResults = emptyList())
-        addLog("▶ approve(address=${addr.take(10)}…)")
+        addLog("▶ approve(address=${addr.take(10)}…, amount=$amount)")
 
         viewModelScope.launch(Dispatchers.IO) {
-            val result = DSRVWallet.approve(address = addr)
+            val result = DSRVWallet.approve(address = addr, amount = amount)
             withContext(Dispatchers.Main) {
                 uiState = uiState.copy(approveLoading = false)
                 if (result.isSuccess) {
@@ -743,7 +747,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(paymentError = "amount (예: 1.5) 를 입력하세요")
             return
         }
-        val sourceUserId = sourceUserIdInput.ifBlank { userId }
+        val sourceUserId = sourceUserIdInput.ifBlank { userUuid }
         if (sourceUserId.isBlank()) {
             uiState = uiState.copy(paymentError = "sourceUserId 가 필요합니다 (userId 입력 후 init)")
             return

@@ -134,6 +134,20 @@
       },
       {
         "kind": "Import",
+        "name": "CryptoKit",
+        "printedName": "CryptoKit",
+        "declKind": "Import",
+        "moduleName": "dsrv_wallet_sdk_ios"
+      },
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "dsrv_wallet_sdk_ios"
+      },
+      {
+        "kind": "Import",
         "name": "Foundation",
         "printedName": "Foundation",
         "declKind": "Import",
@@ -772,7 +786,7 @@
           {
             "kind": "Function",
             "name": "approve",
-            "printedName": "approve(address:)",
+            "printedName": "approve(address:amount:)",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -801,11 +815,17 @@
                 "name": "String",
                 "printedName": "Swift.String",
                 "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
               }
             ],
             "declKind": "Func",
-            "usr": "s:19dsrv_wallet_sdk_ios10DSRVWalletO7approve7addressAA12WalletResultOySayAA07ChainTxI0VGGSS_tYaFZ",
-            "mangledName": "$s19dsrv_wallet_sdk_ios10DSRVWalletO7approve7addressAA12WalletResultOySayAA07ChainTxI0VGGSS_tYaFZ",
+            "usr": "s:19dsrv_wallet_sdk_ios10DSRVWalletO7approve7address6amountAA12WalletResultOySayAA07ChainTxJ0VGGSS_SStYaFZ",
+            "mangledName": "$s19dsrv_wallet_sdk_ios10DSRVWalletO7approve7address6amountAA12WalletResultOySayAA07ChainTxJ0VGGSS_SStYaFZ",
             "moduleName": "dsrv_wallet_sdk_ios",
             "static": true,
             "declAttributes": [
@@ -4134,6 +4154,20 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SendableMetatype",
+            "printedName": "SendableMetatype",
+            "usr": "s:s16SendableMetatypeP",
+            "mangledName": "$ss16SendableMetatypeP"
           }
         ]
       },
@@ -7099,13 +7133,6 @@
   },
   "ConstValues": [
     {
-      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/approve\/ApproveOperations.swift",
-      "kind": "StringLiteral",
-      "offset": 413,
-      "length": 5,
-      "value": "\"MAX\""
-    },
-    {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/auth\/DeviceKeyManager.swift",
       "kind": "StringLiteral",
       "offset": 599,
@@ -7171,14 +7198,14 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/backup\/PlaintextBackupRepository.swift",
       "kind": "StringLiteral",
-      "offset": 589,
+      "offset": 722,
       "length": 35,
       "value": "\"com.dsrv.wallet.sdk.backup.tier_b\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/backup\/PlaintextBackupRepository.swift",
       "kind": "StringLiteral",
-      "offset": 653,
+      "offset": 786,
       "length": 22,
       "value": "\"share3.backup.plain.\""
     },
@@ -7591,7 +7618,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/DSRVWallet.swift",
       "kind": "Array",
-      "offset": 37628,
+      "offset": 40389,
       "length": 2,
       "value": "[]"
     },

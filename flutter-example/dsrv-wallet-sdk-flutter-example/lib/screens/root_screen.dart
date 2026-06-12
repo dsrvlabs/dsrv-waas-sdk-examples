@@ -59,7 +59,7 @@ class _RootScreenState extends State<RootScreen> {
           case _Stage.walletList:
             return WalletListScreen(
               wallet: wallet,
-              onBack: () => wallet.resetWallet(), // userId 비워짐 → Login 으로 가드
+              onBack: () => setState(() => _stage = _Stage.login),
               onWalletSelected: () =>
                   setState(() => _stage = _Stage.walletDetail),
             );

@@ -10,10 +10,17 @@ class BackupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hint = Theme.of(context).hintColor;
+    final errorColor = Theme.of(context).colorScheme.error;
+
     return SectionCard(
-      'Backup',
+      '백업',
       subtitle: 'pending share3 들을 iCloud Keychain / Block Store 에 일괄 sync',
       children: [
+        Text(
+          'PENDING 상태인 share 를 클라우드에 일괄 sync 합니다. Passkey / 생체인증이 필요할 수 있습니다.',
+          style: TextStyle(fontSize: 11, color: hint),
+        ),
         AsyncButton(
           title: '백업',
           isEnabled: wallet.initialized,
@@ -21,58 +28,51 @@ class BackupSection extends StatelessWidget {
           onPressed: wallet.backup,
         ),
         if (wallet.backupResult != null)
-          Text('✓ ${wallet.backupResult}',
-              style: const TextStyle(color: Colors.green, fontSize: 12)),
+          Text('✓ ${wallet.backupResult}', style: const TextStyle(fontSize: 12)),
         const Divider(),
-        const Text('디버그',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 40,
-                child: OutlinedButton(
-                  onPressed: wallet.busy('dump') ? null : wallet.dumpBackup,
-                  child: const Text('Dump', style: TextStyle(fontSize: 13)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 40,
-                child: OutlinedButton(
-                  onPressed: wallet.busy('clearBackup') ? null : wallet.clearBackup,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  child: const Text('전체 삭제', style: TextStyle(fontSize: 13)),
-                ),
-              ),
-            ),
-          ],
+        Text('디버그', style: TextStyle(fontSize: 12, color: hint)),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton(
+            onPressed: wallet.busy('dump') ? null : wallet.dumpBackup,
+            child: const Text('Block Store / Keychain dump'),
+          ),
         ),
         SizedBox(
-          height: 36,
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: errorColor,
+              side: BorderSide(color: errorColor),
+            ),
+            onPressed: wallet.busy('clearBackup') ? null : wallet.clearBackup,
+            child: const Text('Backup 전체 삭제'),
+          ),
+        ),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
           child: OutlinedButton(
             onPressed:
                 wallet.busy('clearDeviceKey') ? null : wallet.clearDeviceKey,
-            child: const Text('Clear Device Key (debug)',
-                style: TextStyle(fontSize: 12)),
+            child: const Text('Clear Device Key (debug)'),
           ),
         ),
         if (wallet.backupDump != null && wallet.backupDump!.isNotEmpty)
           Container(
-            constraints: const BoxConstraints(maxHeight: 200),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxHeight: 240),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
-            padding: const EdgeInsets.all(8),
             child: SingleChildScrollView(
               child: SelectableText(
                 wallet.backupDump!,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 10),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
               ),
             ),
           ),

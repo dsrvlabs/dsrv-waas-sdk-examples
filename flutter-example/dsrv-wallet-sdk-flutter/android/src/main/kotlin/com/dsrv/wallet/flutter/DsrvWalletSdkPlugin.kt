@@ -83,7 +83,8 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 )
                 val r = DSRVWallet.initialize(
                     appContext, sdkId, credential, dartAuthHandler(),
-                    baseUrl = call.arg("baseUrl")
+                    baseUrl = call.arg("baseUrl"),
+                    cloudProjectNumber = call.argument<Number>("cloudProjectNumber")?.toLong()
                 )
                 r.reply(result) { null }
             }
@@ -151,7 +152,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             "revoke" -> DSRVWallet.revoke(call.arg("address"))
                 .reply(result) { list -> list.map(::chainTxResultMap) }
 
-            "approve" -> DSRVWallet.approve(call.arg("address"))
+            "approve" -> DSRVWallet.approve(call.arg("address"), call.arg("amount"))
                 .reply(result) { list -> list.map(::chainTxResultMap) }
 
             "backup" -> {

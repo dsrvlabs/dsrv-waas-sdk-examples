@@ -406,20 +406,23 @@ class WalletState extends ChangeNotifier {
         }, (e) => _log('✗ ${e.message}'));
       });
 
-  // ===== Approve (multicall MAX — 지원 chain 전체 일괄, delegate 선행 필요) =====
+  // ===== Approve (multicall — 지원 chain 전체 일괄, delegate 선행 필요) =====
 
-  /// 결제 컨트랙트로의 토큰 approve(MAX) 셋업을 **지원 chain 전체**에 일괄 처리한다.
+  /// 결제 컨트랙트로의 토큰 approve 셋업을 **지원 chain 전체**에 일괄 처리한다.
   /// 대상 token 은 WaaS 의 `project_assets` 에 등록된 활성 ERC-20 으로 자동 결정 (client 입력 없음).
   /// 결과는 chain 별 [ChainTxResult] 목록 — 성공/실패 모두 보존.
-  Future<void> approve() => _op('approve', () async {
+  ///
+  /// [amount]: "MAX" (unbounded) 또는 "0" (revoke). 비어 있으면 "MAX". SDK 가 uppercase 정규화.
+  Future<void> approve({String amount = ''}) => _op('approve', () async {
         if (!initialized || address.isEmpty) {
           approveError = 'address 가 필요합니다 (createAddress 먼저 실행)';
           return;
         }
+        final resolvedAmount = amount.isEmpty ? 'MAX' : amount;
         approveResults = [];
         approveError = null;
-        _log('▶ approve(address=${address.substring(0, 10)}…)');
-        final r = await DSRVWallet.approve(address: address);
+        _log('▶ approve(address=${address.substring(0, 10)}…, amount=$resolvedAmount)');
+        final r = await DSRVWallet.approve(address: address, amount: resolvedAmount);
         r.fold((list) {
           approveResults = list;
           _logChainResults('approve', list);
@@ -456,7 +459,8 @@ class WalletState extends ChangeNotifier {
 
   /// customer-backend `POST /payments` 호출. 서버가 quote → paymentDigest 서명 → execute 통합.
   ///
-  /// 비어 있는 입력은 default 채움: sourceUserId=userId, chainId=selectedChainId,
+  /// 비어 있는 입력은 default 채움: sourceUserId=userUuid (raw userId 시드의 결정적 UUID —
+  /// WaaS 가 topup wallet 등록 시 external_user_ref 로 박는 값과 일치), chainId=selectedChainId,
   /// token=USDC, from=address, paymentType=0
   Future<void> pay({
     String chainId = '',
@@ -503,7 +507,8 @@ class WalletState extends ChangeNotifier {
         _log('▶ pay(chainId=$chainIdInt, from=${address.substring(0, 10)}…, to=${to.substring(0, 10)}…, amount=$amount)');
         try {
           paymentResult = await _paymentRepo.pay(PaymentRequest(
-            sourceUserId: userId,
+            // raw userId 가 아닌 userUuid (UUID v3 derive) — wallet_topup.external_user_ref 와 일치.
+            sourceUserId: userUuid,
             chainId: chainIdInt,
             token: resolvedToken,
             from: address,

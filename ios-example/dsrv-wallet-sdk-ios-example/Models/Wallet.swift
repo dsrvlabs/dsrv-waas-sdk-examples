@@ -676,10 +676,12 @@ final class Wallet: ObservableObject {
 
     // MARK: - Approve
 
-    /// 결제 컨트랙트로의 토큰 approve(MAX) 셋업을 **지원 chain 전체**에 일괄 처리한다.
+    /// 결제 컨트랙트로의 토큰 approve 셋업을 **지원 chain 전체**에 일괄 처리한다.
     /// 대상 token 은 WaaS 의 `project_assets` 에 등록된 활성 ERC-20 으로 자동 결정 (client 입력 없음).
     /// 위임이 사전에 설치되어 있어야 한다 (`delegate` 선행).
-    func approve(addressInput: String = "") {
+    ///
+    /// - Parameter amountInput: "MAX" (unbounded) 또는 "0" (revoke). 비어 있으면 "MAX". SDK 가 uppercase 정규화.
+    func approve(addressInput: String = "", amountInput: String = "") {
         guard uiState.sdkInitialized else {
             uiState.approveError = "SDK 가 초기화되지 않았습니다"
             return
@@ -689,14 +691,15 @@ final class Wallet: ObservableObject {
             uiState.approveError = "address 가 필요합니다 (createAddress 먼저 실행)"
             return
         }
+        let amount = amountInput.isEmpty ? "MAX" : amountInput
 
         uiState.approveLoading = true
         uiState.approveError = nil
         uiState.approveResults = []
-        addLog("▶ approve(address=\(addr.prefix(10))…)")
+        addLog("▶ approve(address=\(addr.prefix(10))…, amount=\(amount))")
 
         Task {
-            let result = await DSRVWallet.approve(address: addr)
+            let result = await DSRVWallet.approve(address: addr, amount: amount)
             uiState.approveLoading = false
             switch result {
             case .success(let list):
@@ -726,7 +729,8 @@ final class Wallet: ObservableObject {
     /// customer-backend `POST /payments` 호출. 서버가 quote → paymentDigest 서명 → execute 를 통합 처리.
     ///
     /// 비어 있는 입력값은 합리적 default 로 채움:
-    ///   sourceUserId → [userId]
+    ///   sourceUserId → [userUuid] (raw userId 를 시드로 만든 결정적 UUID — WaaS 가 topup
+    ///                  wallet 등록 시 external_user_ref 로 박는 값과 동일해야 매칭됨)
     ///   chainId      → 선택된 chain (없으면 demoChainIdFallback)
     ///   token        → 선택된 chain 의 USDC (TokenConfig)
     ///   from         → 현재 선택된 지갑 address
@@ -757,7 +761,8 @@ final class Wallet: ObservableObject {
             uiState.paymentError = "amount (예: 1.5) 를 입력하세요"
             return
         }
-        let sourceUserId = sourceUserIdInput.isEmpty ? userId : sourceUserIdInput
+        // raw userId 가 아닌 userUuid (UUID v3 derive) 사용 — wallet_topup.external_user_ref 와 일치시킴.
+        let sourceUserId = sourceUserIdInput.isEmpty ? userUuid : sourceUserIdInput
         if sourceUserId.isEmpty {
             uiState.paymentError = "sourceUserId 가 필요합니다"
             return

@@ -144,7 +144,10 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
             reply(r, result) { $0.map(self.chainTxResultMap) }
 
         case "approve":
-            let r = await DSRVWallet.approve(address: try requiredString(args, "address"))
+            let r = await DSRVWallet.approve(
+                address: try requiredString(args, "address"),
+                amount: try requiredString(args, "amount")
+            )
             reply(r, result) { $0.map(self.chainTxResultMap) }
 
         case "backup":

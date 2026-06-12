@@ -42,7 +42,7 @@ public enum DSRVWallet {
   nonisolated(nonsending) public static func revoke(address: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func approve(address: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
+  nonisolated(nonsending) public static func approve(address: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.ChainTxResult]>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
   nonisolated(nonsending) public static func buildTx(address: Swift.String, chainId: Swift.String, asset: dsrv_wallet_sdk_ios.TransferAsset, recipient: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxBuildResult>
@@ -148,7 +148,7 @@ public struct TxHashResult {
   public let txHash: Swift.String
   public init(txHash: Swift.String)
 }
-public struct ChainTxResult {
+public struct ChainTxResult : Swift.Sendable {
   public let chainId: Swift.String
   public let outcome: Swift.String
   public let txHash: Swift.String?

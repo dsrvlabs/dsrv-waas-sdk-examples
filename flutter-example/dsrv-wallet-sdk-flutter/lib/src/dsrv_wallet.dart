@@ -19,6 +19,7 @@ class DSRVWallet {
     required UserCredential userCredential,
     required AuthHandler authHandler,
     required String baseUrl,
+    int? cloudProjectNumber,
   }) async {
     NativeBridge.setAuthHandler(authHandler);
     return _guard(() async {
@@ -28,6 +29,7 @@ class DSRVWallet {
         'credentialValue': userCredential.value,
         'provider': userCredential.provider,
         'baseUrl': baseUrl,
+        if (cloudProjectNumber != null) 'cloudProjectNumber': cloudProjectNumber,
       });
       return null;
     });
@@ -201,14 +203,19 @@ class DSRVWallet {
     });
   }
 
-  /// 결제 컨트랙트로의 토큰 approve(MAX) 셋업을 **지원 chain 전체**에 일괄 처리.
+  /// 결제 컨트랙트로의 토큰 approve 셋업을 **지원 chain 전체**에 일괄 처리.
   ///
   /// 대상 chain × token 은 client 가 명시하지 않으며 WaaS 가 `project_assets` 의 활성 ERC-20 으로
   /// 자동 결정. 결과는 chain 별 [ChainTxResult] 목록 (성공/실패 모두 포함). delegate 선행 필요.
+  ///
+  /// [amount]: "MAX" (unbounded) 또는 "0" (revoke). SDK 가 uppercase 정규화 후 서버 전달.
   static Future<WalletResult<List<ChainTxResult>>> approve(
-      {required String address}) {
+      {required String address, required String amount}) {
     return _guard(() async {
-      final list = await NativeBridge.invokeList('approve', {'address': address});
+      // 서버는 amount sentinel 을 대문자 "MAX" / "0" 로만 받음 — 호출자가 소문자로 줘도 normalize.
+      final normalizedAmount = amount.toUpperCase();
+      final list = await NativeBridge.invokeList(
+          'approve', {'address': address, 'amount': normalizedAmount});
       return (list ?? const [])
           .map((e) => ChainTxResult.fromMap(e as Map))
           .toList();

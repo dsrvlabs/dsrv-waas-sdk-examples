@@ -1,115 +1,233 @@
+import 'package:dsrv_wallet_sdk/dsrv_wallet_sdk.dart';
 import 'package:flutter/material.dart';
 
 import '../ui.dart';
 import '../wallet_state.dart';
 
 /// Android `AccountSection.kt` / iOS `AccountSection.swift` 대응 —
-/// account 생성/조회 + 선택, MPC 키 create.
-class AccountSection extends StatefulWidget {
+/// account 생성/조회 + 지갑 발급. account 별 ListTile + RadioButton + LabelDialog 패턴.
+///
+/// Note: Flutter `wallet.createAddress()` 는 selectedAccountId 를 사용 — UI 측에서 account
+/// 헤더의 "+ 지갑" 버튼은 해당 accountId 로 selectAccount 후 createAddress 호출.
+class AccountSection extends StatelessWidget {
   final WalletState wallet;
   const AccountSection({super.key, required this.wallet});
 
   @override
-  State<AccountSection> createState() => _AccountSectionState();
-}
-
-class _AccountSectionState extends State<AccountSection> {
-  final _label = TextEditingController();
-
-  @override
-  void dispose() {
-    _label.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final wallet = widget.wallet;
+    final hint = Theme.of(context).hintColor;
+    final loading = wallet.busy('getAccountList');
+
     return SectionCard(
-      'Account',
-      subtitle: 'account 생성/조회 + MPC 키 create',
+      '계정 & 지갑',
+      subtitle: '계정 생성 · 지갑 발급',
       children: [
-        Field(_label, 'label (비우면 자동)'),
         Row(
           children: [
             Expanded(
-              child: AsyncButton(
-                title: 'Create Account',
-                isEnabled: wallet.initialized,
-                isLoading: wallet.busy('createAccount'),
-                onPressed: () => wallet.createAccount(_label.text),
-              ),
+              child: Text('계정 (${wallet.accounts.length})',
+                  style:
+                      const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: AsyncButton(
-                title: 'List',
-                isEnabled: wallet.initialized,
-                isLoading: wallet.busy('getAccountList'),
-                onPressed: wallet.getAccountList,
+            if (loading)
+              const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              TextButton(
+                onPressed: wallet.initialized ? wallet.getAccountList : null,
+                child: const Text('조회'),
+              ),
+            TextButton(
+              onPressed: (wallet.initialized && !wallet.busy('createAccount'))
+                  ? () => _showLabelDialog(
+                        context: context,
+                        title: '새 계정',
+                        onConfirm: (label) => wallet.createAccount(label),
+                      )
+                  : null,
+              child: wallet.busy('createAccount')
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('+ 계정'),
+            ),
+          ],
+        ),
+        if (wallet.accounts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              loading ? '불러오는 중…' : '계정 없음 — [+ 계정] 으로 생성',
+              style: TextStyle(fontSize: 12, color: hint),
+            ),
+          )
+        else
+          for (var i = 0; i < wallet.accounts.length; i++) ...[
+            _AccountHeader(
+              account: wallet.accounts[i],
+              onAddWallet: () {
+                wallet.selectAccount(wallet.accounts[i].accountId);
+                _showLabelDialog(
+                  context: context,
+                  title: '새 지갑',
+                  onConfirm: (_) => wallet.createAddress(),
+                );
+              },
+            ),
+            if (wallet.accounts[i].addresses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 4, bottom: 4),
+                child: Text('지갑 없음',
+                    style: TextStyle(fontSize: 11, color: hint)),
+              )
+            else
+              for (final addr in wallet.accounts[i].addresses)
+                _WalletRow(
+                  address: addr,
+                  selected: addr.address.toLowerCase() ==
+                      wallet.address.toLowerCase(),
+                  onTap: () {
+                    wallet.selectAccount(wallet.accounts[i].accountId);
+                    wallet.selectWallet(addr.address);
+                  },
+                ),
+            if (i < wallet.accounts.length - 1) const Divider(height: 1),
+          ],
+      ],
+    );
+  }
+
+  Future<void> _showLabelDialog({
+    required BuildContext context,
+    required String title,
+    required void Function(String) onConfirm,
+  }) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'label 을 입력하세요 (비우면 자동 생성)',
+              style: TextStyle(
+                  fontSize: 12, color: Theme.of(ctx).hintColor),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'label',
+                isDense: true,
+                border: OutlineInputBorder(),
               ),
             ),
           ],
         ),
-        if (wallet.accounts.isNotEmpty)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: wallet.accounts.map((a) {
-              final selected = a.accountId == wallet.selectedAccountId;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: selected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).dividerColor,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: GestureDetector(
-                  onTap: () => wallet.selectAccount(a.accountId),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${a.label} — ${a.accountId}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ...a.addresses.map((w) {
-                        final addrSel = w.address == wallet.address;
-                        return GestureDetector(
-                          onTap: () => wallet.selectWallet(w.address),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '  ${addrSel ? "▶ " : "  "}${w.address}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'monospace',
-                                color: addrSel
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).hintColor,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
           ),
-        AsyncButton(
-          title: 'Create Wallet (MPC 키 생성)',
-          isEnabled: wallet.initialized && wallet.selectedAccountId != null,
-          isLoading: wallet.busy('createAddress'),
-          onPressed: wallet.createAddress,
-        ),
-        if (wallet.address.isNotEmpty) ...[
-          const Text('Current address', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          CopyableText(wallet.address),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('생성'),
+          ),
         ],
-      ],
+      ),
+    );
+    if (result != null) onConfirm(result);
+  }
+}
+
+class _AccountHeader extends StatelessWidget {
+  final AccountInfo account;
+  final VoidCallback onAddWallet;
+  const _AccountHeader({required this.account, required this.onAddWallet});
+
+  @override
+  Widget build(BuildContext context) {
+    final hint = Theme.of(context).hintColor;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(account.label,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(
+                  'id ${_shortId(account.accountId)} · ${account.addresses.length} wallets',
+                  style: TextStyle(fontSize: 11, color: hint),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onAddWallet, child: const Text('+ 지갑')),
+        ],
+      ),
     );
   }
 }
+
+class _WalletRow extends StatelessWidget {
+  final AddressInfo address;
+  final bool selected;
+  final VoidCallback onTap;
+  const _WalletRow({
+    required this.address,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hint = Theme.of(context).hintColor;
+    final display = address.address.length <= 16
+        ? address.address
+        : '${address.address.substring(0, 10)}…${address.address.substring(address.address.length - 6)}';
+    final label = address.label;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Radio<bool>(
+              value: true,
+              groupValue: selected ? true : null,
+              onChanged: (_) => onTap(),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(display,
+                      style: const TextStyle(
+                          fontSize: 13, fontFamily: 'monospace')),
+                  if (label != null && label.isNotEmpty)
+                    Text(label,
+                        style: TextStyle(fontSize: 11, color: hint)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _shortId(String id) =>
+    id.length <= 12 ? id : '${id.substring(0, 8)}…${id.substring(id.length - 4)}';

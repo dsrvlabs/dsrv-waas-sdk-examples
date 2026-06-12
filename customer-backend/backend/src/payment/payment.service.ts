@@ -149,6 +149,7 @@ export class PaymentService {
       const body = {
         paymentType: 'TOPUP',
         sourceUserId: request.sourceUserId,
+        chainId: request.chainId,
         source: {
           paymentRail: 'EVM',
           fromAddress: request.from,
