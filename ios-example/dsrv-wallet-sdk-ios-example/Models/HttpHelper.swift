@@ -31,7 +31,7 @@ public enum HttpHelper {
         return responseString
     }
 
-    public static func get(url: String, queryItems: [URLQueryItem]) async throws -> String {
+    public static func get(url: String, queryItems: [URLQueryItem], timeout: TimeInterval? = nil) async throws -> String {
         guard var components = URLComponents(string: url) else {
             throw HttpError.invalidURL(url)
         }
@@ -40,7 +40,7 @@ public enum HttpHelper {
             throw HttpError.invalidURL(url)
         }
 
-        var request = URLRequest(url: url)
+        var request = timeout.map { URLRequest(url: url, timeoutInterval: $0) } ?? URLRequest(url: url)
         request.httpMethod = "GET"
 
         let (data, response) = try await URLSession.shared.data(for: request)

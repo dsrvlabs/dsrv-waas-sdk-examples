@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:dsrv_wallet_sdk/dsrv_wallet_sdk.dart';
 
+import 'asset_value_repository.dart';
 import 'config.dart';
 import 'backend_auth_handler.dart';
 import 'payment_repository.dart';
@@ -11,10 +12,6 @@ import 'user_session.dart';
 
 /// 앱 상태 + SDK 호출 — iOS `Wallet.swift` / Android `Wallet.kt` 와 1:1 대응.
 class WalletState extends ChangeNotifier {
-  static const _demoChainIdFallback = '11155111'; // Sepolia
-  static const _demoRecipient = '0xaBd24536b4871678519F0Ec6975CB0ED0E41855F';
-  static const _demoAmountWei = '1000000000000000'; // 0.001 ETH
-
   // ===== Init / 식별자 =====
 
   bool initialized = false;
@@ -34,18 +31,39 @@ class WalletState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// userId 를 변경한다. example state 만 초기화하므로 SDK 의 `initialized` 는 유지된다 —
-  /// 완전한 사용자 전환을 원하면 [resetWallet] 을 사용해 `DSRVWallet.reset()` 까지 트리거하라.
+  /// userId 를 변경한다 (사용자 전환). 이미 SDK 초기화 상태라면 [DSRVWallet.reset] 으로
+  /// `initialized` 플래그를 풀어 다음 [initialize] 가 새 [UserCredential] 로 진행되게 한다.
   Future<void> changeUserId(String newUserId) async {
     final trimmed = newUserId.trim();
     if (trimmed.isEmpty || trimmed == userId) return;
 
     if (initialized) {
+      await DSRVWallet.reset();
       publicKey = '';
       address = '';
       initialized = false;
+      initializing = false;
       initError = null;
-      _log('⚙ user 변경 — SDK 재초기화 필요');
+      accounts = [];
+      selectedAccountId = null;
+      chains = [];
+      selectedChainId = null;
+      lastTxHash = null;
+      transferError = null;
+      historyItems = [];
+      historyTotal = 0;
+      historyPage = 0;
+      historyError = null;
+      delegateResults = [];
+      revokeResults = [];
+      approveResults = [];
+      approveError = null;
+      paymentResult = null;
+      paymentError = null;
+      backupResult = null;
+      restoreResult = null;
+      backupDump = null;
+      _log('⚙ SDK reset (userId 변경)');
     }
     userId = trimmed;
     await saveUserId(trimmed);
@@ -67,6 +85,7 @@ class WalletState extends ChangeNotifier {
     chains = [];
     selectedChainId = null;
     lastTxHash = null;
+    transferError = null;
     historyItems = [];
     historyTotal = 0;
     historyPage = 0;
@@ -97,6 +116,7 @@ class WalletState extends ChangeNotifier {
   String publicKey = '';
 
   String? lastTxHash;
+  String? transferError;
   List<TransactionHistoryItem> historyItems = [];
   int historyTotal = 0;
   int historyPage = 0;
@@ -122,6 +142,9 @@ class WalletState extends ChangeNotifier {
     logs.insert(0, '[$t] $m');
     notifyListeners();
   }
+
+  /// 외부 컴포넌트가 in-app Log 화면에 한 줄 남길 때 사용하는 public 진입점.
+  void log(String m) => _log(m);
 
   void clearLogs() {
     logs.clear();
@@ -210,8 +233,11 @@ class WalletState extends ChangeNotifier {
   }
 
   void selectWallet(String addr) {
-    address = addr;
-    final acc = accounts.expand((a) => a.addresses).where((w) => w.address == addr);
+    final normalized = addr.toLowerCase();
+    final acc = accounts
+        .expand((a) => a.addresses)
+        .where((w) => w.address.toLowerCase() == normalized);
+    address = acc.isEmpty ? normalized : acc.first.address.toLowerCase();
     publicKey = acc.isEmpty ? '' : acc.first.publicKey;
     notifyListeners();
   }
@@ -244,17 +270,18 @@ class WalletState extends ChangeNotifier {
 
   // ===== Create address =====
 
-  Future<void> createAddress() => _op('createAddress', () async {
+  Future<void> createAddress({String? label}) => _op('createAddress', () async {
         if (!initialized) return;
         final accountId = selectedAccountId;
         if (accountId == null || accountId.isEmpty) {
           _log('✗ accountId 가 필요합니다 (먼저 getAccountList / createAccount)');
           return;
         }
+        final lbl = (label != null && label.isNotEmpty) ? label : null;
         final chainType = selectedChainType;
-        _log('▶ createAddress(accountId=$accountId, chainType=$chainType)');
+        _log('▶ createAddress(accountId=$accountId, chainType=$chainType, label=${lbl ?? "null"})');
         final r = await DSRVWallet.createAddress(
-            accountId: accountId, chainType: chainType);
+            accountId: accountId, chainType: chainType, label: lbl);
         r.fold((k) {
           address = k.address;
           publicKey = k.publicKey;
@@ -283,18 +310,44 @@ class WalletState extends ChangeNotifier {
     String? contractAddress,
   }) =>
       _op('transfer', () async {
-        if (!initialized) return;
-        if (address.isEmpty) {
-          _log('✗ transfer: address 없음 (create 먼저)');
+        transferError = null;
+        lastTxHash = null;
+        if (!initialized) {
+          transferError = 'SDK 가 초기화되지 않았습니다';
+          notifyListeners();
+          _log('✗ transfer: not initialized');
           return;
         }
-        final c = chainId.isEmpty
-            ? (selectedChainId ?? _demoChainIdFallback)
-            : chainId;
-        final to = recipient.isEmpty ? _demoRecipient : recipient;
-        final amt = amount.isEmpty ? _demoAmountWei : amount;
+        if (address.isEmpty) {
+          transferError = 'address 가 없습니다 (createAddress 먼저)';
+          notifyListeners();
+          _log('✗ transfer: address empty');
+          return;
+        }
+        if (recipient.isEmpty) {
+          transferError = 'recipient 주소를 입력하세요';
+          notifyListeners();
+          _log('✗ transfer: recipient empty');
+          return;
+        }
+        if (amount.isEmpty) {
+          transferError = '금액을 입력하세요';
+          notifyListeners();
+          _log('✗ transfer: amount empty');
+          return;
+        }
+        final c = chainId.isEmpty ? (selectedChainId ?? '') : chainId;
+        if (c.isEmpty) {
+          transferError = 'chain 을 먼저 선택하세요';
+          notifyListeners();
+          _log('✗ transfer: chainId empty');
+          return;
+        }
+        final to = recipient;
+        final amt = amount;
 
-        _log('▶ transfer(chainId=$c, to=${to.substring(0, 10)}…, amount=$amt)');
+        transferError = null;
+        _log('▶ transfer(chainId=$c, to=${to.substring(0, 10)}…, amount=$amount)');
 
         try {
           // ── 1) customer-backend build ─────────────────────────────
@@ -302,7 +355,7 @@ class WalletState extends ChangeNotifier {
           final build = await _transferRepo.buildHash(BuildTransferRequest(
             fromAddress: address,
             toAddress: to,
-            amount: amt,
+            amount: amount,
             chainId: c,
             contractAddress: contractAddress,
           ));
@@ -321,6 +374,8 @@ class WalletState extends ChangeNotifier {
             (e) => e.message,
           );
           if (signFailed != null) {
+            transferError = 'MPC sign 실패: $signFailed';
+            notifyListeners();
             _log('✗ transfer sign FAILED: $signFailed');
             return;
           }
@@ -337,6 +392,8 @@ class WalletState extends ChangeNotifier {
             _log('✓ transfer queued — status=${broadcast.status}, batchTxId=${broadcast.batchTxId} (bundler 경로, txHash 후속 polling)');
           }
         } catch (e) {
+          transferError = '전송 실패: $e';
+          notifyListeners();
           _log('✗ transfer FAILED: $e');
         }
       });
@@ -382,6 +439,93 @@ class WalletState extends ChangeNotifier {
           _log('✗ getTransactionHistory FAILED: $e');
         }
       });
+
+  // ===== Asset value (KRW 환산) =====
+
+  late final AssetValueRepository _assetValueRepo =
+      AssetValueRepository(AppConfig.customerBackendUrl);
+
+  /// 보유분 KRW 환산값 — 포맷된 "₩..." 문자열, 시세 미가용/실패 시 null.
+  /// 잔액 RPC 조회는 View 가, 가치 조회+포맷은 여기서 담당한다 (Android `Wallet.getKrwValue` 와 동일).
+  /// 자체 try/catch 로 실패를 흡수하므로 호출 측 잔액 표시 흐름과 독립적이다.
+  Future<String?> getKrwValue({
+    required String chainId,
+    String? contractAddress,
+    required String amount,
+  }) async {
+    final label =
+        (contractAddress != null && contractAddress.isNotEmpty) ? contractAddress : 'NATIVE';
+    try {
+      // 잔액 0 → 0개 × 단가 = ₩0. 백엔드는 amount=0 이면 holdings 를 생략하므로 직접 표시.
+      if (amount.replaceAll(RegExp(r'[.0]'), '').isEmpty) {
+        return _formatKrw('0');
+      }
+      final res = await _assetValueRepo.getLatestValue(
+        chainId: chainId,
+        contractAddress: contractAddress,
+        amount: amount,
+      );
+      final total = res.holdings?.totalValue;
+      if (total == null) {
+        _log('⚠ KRW 시세 미가용: chainId=$chainId contract=$label');
+        return null;
+      }
+      return _formatKrw(total);
+    } catch (e) {
+      _log('✗ KRW 환산 실패: chainId=$chainId contract=$label — $e');
+      return null;
+    }
+  }
+
+  /// 지수표기("1e-7", "1.23E+21")를 평문 10진수 문자열로 펼친다.
+  /// AssetValueRepository 가 JSON number 를 `num.toString()` 으로 정규화할 때 매우 크거나 작은 값은
+  /// 지수표기가 나올 수 있어, [_formatKrw] 의 BigInt.parse 가 깨지는 것을 방지한다. 평문이면 그대로 반환.
+  String _toPlainDecimal(String s) {
+    final lower = s.toLowerCase();
+    final eIdx = lower.indexOf('e');
+    if (eIdx < 0) return s;
+    final neg = s.startsWith('-');
+    final mantissa = neg ? s.substring(1, eIdx) : s.substring(0, eIdx);
+    final exp = int.tryParse(s.substring(eIdx + 1)) ?? 0;
+    final dot = mantissa.indexOf('.');
+    final digits = dot < 0 ? mantissa : mantissa.replaceFirst('.', '');
+    final pointPos = (dot < 0 ? mantissa.length : dot) + exp;
+    String result;
+    if (pointPos <= 0) {
+      result = '0.${'0' * (-pointPos)}$digits';
+    } else if (pointPos >= digits.length) {
+      result = digits + '0' * (pointPos - digits.length);
+    } else {
+      result = '${digits.substring(0, pointPos)}.${digits.substring(pointPos)}';
+    }
+    return neg ? '-$result' : result;
+  }
+
+  /// totalValue ("345690.4521") → "₩345,690.45" — 천 단위 구분 + 소수점 2자리 반올림.
+  ///
+  /// price-hub 의 BigDecimal 직렬화값이므로 double 변환 없이 문자열/BigInt 로 처리해
+  /// 큰 값/긴 소수에서의 정밀도 손실을 피한다 (round-half-up).
+  String _formatKrw(String rawValue) {
+    final totalValue = _toPlainDecimal(rawValue.trim());
+    final neg = totalValue.startsWith('-');
+    final unsigned = neg ? totalValue.substring(1) : totalValue;
+    final dot = unsigned.indexOf('.');
+    final intPart = dot < 0 ? unsigned : unsigned.substring(0, dot);
+    final fracPart = dot < 0 ? '' : unsigned.substring(dot + 1);
+    // 정수부 + 소수 2자리를 합쳐 정수(cents)로 만든 뒤 3번째 소수 자리로 반올림.
+    final frac2 = fracPart.padRight(3, '0');
+    var cents =
+        BigInt.parse((intPart.isEmpty ? '0' : intPart) + frac2.substring(0, 2));
+    if (int.parse(frac2[2]) >= 5) cents += BigInt.one;
+    final centsStr = cents.toString().padLeft(3, '0');
+    final whole = centsStr.substring(0, centsStr.length - 2);
+    final cent = centsStr.substring(centsStr.length - 2);
+    final grouped = whole.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (m) => ',',
+    );
+    return '${neg ? '-' : ''}₩$grouped.$cent';
+  }
 
   // ===== Delegate / Revoke (EIP-7702) =====
 
@@ -482,9 +626,11 @@ class WalletState extends ChangeNotifier {
           return;
         }
 
-        final c = chainId.isEmpty
-            ? (selectedChainId ?? _demoChainIdFallback)
-            : chainId;
+        final c = chainId.isEmpty ? (selectedChainId ?? '') : chainId;
+        if (c.isEmpty) {
+          paymentError = 'chain 을 먼저 선택하세요';
+          return;
+        }
         final chainIdInt = int.tryParse(c);
         if (chainIdInt == null) {
           paymentError = 'chainId 정수 변환 실패: $c';
@@ -544,11 +690,10 @@ class WalletState extends ChangeNotifier {
         r.fold((list) {
           final ok = list.where((e) => e.success).length;
           final fail = list.length - ok;
-          if (list.isNotEmpty && list.first.success) {
-            address = list.firstWhere((e) => e.success).address;
-          }
           restoreResult = '복원: 성공 $ok / 실패 $fail';
           _log('✓ $restoreResult');
+          // 복원 후 계정 목록 새로고침
+          getAccountList();
         }, (e) => _log('✗ ${e.message}'));
       });
 

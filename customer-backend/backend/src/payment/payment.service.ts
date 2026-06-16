@@ -143,13 +143,15 @@ export class PaymentService {
       const params = quote.params;
       // Payments stablecoin transaction create — TOPUP 분기는 paymentType=TOPUP 으로 트리거.
       //
-      // stablecoin 측이 quote 시점에 발급한 값(paymentUuid/customerEpoch/deadline/maxFeeAmount)을 권위로 사용.
-      // chainId/token/feeAllocations 등 stablecoin 이 자체 도출하거나 사용하지 않는 필드는 전송하지 않는다
-      // (CreateTransactionRequest 가 ignoreUnknown=false 라 무관 필드는 400 으로 거부됨).
+      // stablecoin 측이 quote 시점에 발급한 값을 그대로 echo:
+      //   - onchainPayment.{paymentUuid, deadline, customerEpoch}: trade authoritative metadata
+      //   - feeAllocations(Hash): 컨트랙트 keccak 검증 대상 — quote raw BigInteger 그대로 forward
+      // chainId 는 on-chain 메타데이터의 일부로 onchainPayment 그룹 안에 위치 (stablecoin DTO 정합).
+      // CreateTransactionRequest 가 ignoreUnknown=false 라 spec 에 없는 필드는 400 으로 거부되므로,
+      // 새 필드 추가 시 stablecoin 서버의 DTO 변경이 선행되어야 한다.
       const body = {
         paymentType: 'TOPUP',
         sourceUserId: request.sourceUserId,
-        chainId: request.chainId,
         source: {
           paymentRail: 'EVM',
           fromAddress: request.from,
@@ -162,6 +164,7 @@ export class PaymentService {
         },
         amount: request.amount,
         onchainPayment: {
+          chainId: request.chainId,
           paymentUuid: params.paymentUuid,
           deadline: params.deadline,
           customerEpoch: params.customerEpoch,

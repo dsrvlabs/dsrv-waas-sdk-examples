@@ -113,7 +113,8 @@ public protocol AuthHandler : AnyObject {
 public struct KeyCreateResult {
   public let publicKey: Swift.String
   public let address: Swift.String
-  public init(publicKey: Swift.String, address: Swift.String)
+  public let addressId: Swift.String
+  public init(publicKey: Swift.String, address: Swift.String, addressId: Swift.String)
 }
 public enum BackupStatus : Swift.String, Swift.Sendable {
   case pending

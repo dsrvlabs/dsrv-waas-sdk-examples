@@ -109,7 +109,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 accountId = call.arg("accountId"),
                 chainType = call.arg("chainType"),
                 label = call.argument<String>("label")
-            ).reply(result) { mapOf("publicKey" to it.publicKey, "address" to it.address) }
+            ).reply(result) { mapOf("publicKey" to it.publicKey, "address" to it.address, "addressId" to it.addressId) }
 
             "transfer" -> DSRVWallet.transfer(
                 address = call.arg("address"),

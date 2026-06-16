@@ -17,6 +17,11 @@ import com.dsrv.wallet.example.wallet.config.TokenConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.Locale
 import java.util.UUID
 
 class Wallet(application: Application) : AndroidViewModel(application) {
@@ -27,6 +32,11 @@ class Wallet(application: Application) : AndroidViewModel(application) {
 
         // demo 용 fallback — selectedChainId 가 없을 때만 사용 (Sepolia)
         private const val DEMO_CHAIN_ID_FALLBACK = "11155111"
+
+        // KRW 표시 포맷 — 결정적 (콤마 그룹 + 점 소수) 출력 위해 US 심볼 고정, HALF_UP 반올림.
+        private val KRW_FORMAT = DecimalFormat("#,##0.00", DecimalFormatSymbols(Locale.US)).apply {
+            roundingMode = RoundingMode.HALF_UP
+        }
 
         /**
          * userId 를 시드로 결정적 UUID (v3) 를 생성한다.
@@ -123,7 +133,6 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     userCredential = userCredential,
                     authHandler = authHandler,
                     baseUrl = dsrvApiBaseUrl,
-                    cloudProjectNumber = 371641890972,
                 )
 
                 if (result.isSuccess) {
@@ -451,6 +460,40 @@ class Wallet(application: Application) : AndroidViewModel(application) {
     // ===== Transaction history (customer-backend GET /sdk/transactions) =====
 
     private val transactionHistoryRepository by lazy { TransactionHistoryRepository(customerBackendUrl) }
+    private val assetValueRepository by lazy { AssetValueRepository(customerBackendUrl) }
+
+    /**
+     * 보유 자산의 KRW 환산 가치 조회 — customer-backend `GET /sdk/asset/by-chain/latest-value`.
+     *
+     * @param contractAddress ERC-20 토큰 주소. 네이티브 ETH 면 null → 쿼리에서 생략.
+     * @param amount          사람이 읽는 십진 잔액 (예: "0.5").
+     * @return "₩#,##0.00" 형식의 표시 문자열, 잔액 0 이면 ₩0.00, 실패 시 null.
+     */
+    suspend fun getKrwValue(chainId: String, contractAddress: String?, amount: String): String? {
+        val contractLabel = contractAddress?.takeIf { it.isNotEmpty() } ?: "NATIVE"
+        return try {
+            // 잔액 0 → 0개 × 단가 = ₩0. price-hub 는 amount=0 이면 holdings 를 생략하므로 앱이 직접 표시.
+            if (BigDecimal(amount).signum() == 0) {
+                "₩" + KRW_FORMAT.format(BigDecimal.ZERO)
+            } else {
+                val response = assetValueRepository.getLatestValue(
+                    chainId = chainId,
+                    contractAddress = contractAddress,
+                    amount = amount,
+                )
+                val totalValue = response.holdings?.totalValue
+                if (totalValue == null) {
+                    addLog("⚠ KRW 시세 미가용: chainId=$chainId contract=$contractLabel")
+                    null
+                } else {
+                    "₩" + KRW_FORMAT.format(BigDecimal(totalValue))
+                }
+            }
+        } catch (t: Throwable) {
+            addLog("✗ KRW 환산 실패: chainId=$chainId contract=$contractLabel — ${t.message}")
+            null
+        }
+    }
 
     /**
      * 거래 내역 조회 — 선택된 지갑 [address] 기준 (fromAddress 필터).

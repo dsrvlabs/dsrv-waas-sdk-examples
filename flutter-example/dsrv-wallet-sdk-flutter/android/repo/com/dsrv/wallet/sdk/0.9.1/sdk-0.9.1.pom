@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.dsrv.wallet</groupId>
   <artifactId>sdk</artifactId>
-  <version>0.9.0</version>
+  <version>0.9.1</version>
   <packaging>aar</packaging>
   <!-- SDK 런타임 의존성 — AAR 소비자(플러그인/앱)에게 transitive 로 전달 -->
   <dependencies>

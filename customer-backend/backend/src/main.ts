@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { configureProxyFromEnv } from './common/http/configure-proxy';
 import * as os from 'os';
 
 function getLocalIpv4(): string {
@@ -19,6 +20,8 @@ function getLocalIpv4(): string {
 }
 
 async function bootstrap() {
+  // HTTPS_PROXY 가 설정된 환경(폐쇄망 등)이면 axios 가 프록시를 경유하도록 구성.
+  configureProxyFromEnv();
   const app = await NestFactory.create(AppModule);
   app.enableCors();
   // whitelist 옵션은 DTO 필드에 class-validator 데코레이터가 있을 때만 의미가 있음.

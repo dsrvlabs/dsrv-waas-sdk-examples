@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../components/address_qr.dart';
 import '../wallet_state.dart';
 import 'feature_screen.dart';
 
@@ -18,6 +19,31 @@ class WalletDetailScreen extends StatelessWidget {
 
   String _short(String s) =>
       s.length <= 16 ? s : '${s.substring(0, 10)}…${s.substring(s.length - 4)}';
+
+  void _showAddressQr(BuildContext context, String address) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('내 지갑 주소'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AddressQr(content: address, size: 220),
+            const SizedBox(height: 8),
+            Text(address,
+                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,18 +121,28 @@ class WalletDetailScreen extends StatelessWidget {
               style: const TextStyle(fontSize: 13)),
           if (address.isNotEmpty) ...[
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.copy, size: 16),
-                label: const Text('주소 복사'),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: address));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('복사됨'),
-                      duration: Duration(seconds: 1)));
-                },
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('주소 복사'),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: address));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('복사됨'),
+                          duration: Duration(seconds: 1)));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _showAddressQr(context, address),
+                    child: const Text('QR'),
+                  ),
+                ),
+              ],
             ),
           ],
         ],

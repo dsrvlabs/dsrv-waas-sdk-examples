@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../components/address_qr.dart';
 import '../components/approve_section.dart';
 import '../components/backup_section.dart';
 import '../components/delegate_section.dart';
@@ -136,13 +138,36 @@ class _QueryFeature extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton(
+                onPressed: wallet.address.isEmpty
+                    ? null
+                    : () {
+                        Clipboard.setData(
+                            ClipboardData(text: wallet.address));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('주소 복사됨'),
+                                duration: Duration(seconds: 1)));
+                      },
+                child: const Text('주소 복사'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
                 onPressed: wallet.address.isEmpty ? null : wallet.getAccountList,
                 child: const Text('계정 새로고침'),
               ),
             ),
           ],
         ),
-        if (wallet.address.isNotEmpty) CopyableText(wallet.address),
+        if (wallet.address.isNotEmpty) ...[
+          Center(child: AddressQr(content: wallet.address, size: 200)),
+          Text(wallet.address,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        ],
+        Text('ⓘ 잔액 조회는 RPC 직접 호출이 필요합니다.',
+            style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor)),
       ],
     );
   }

@@ -348,7 +348,7 @@ private struct WalletSummaryCard: View {
         .sheet(isPresented: $qrOpen) {
             VStack(spacing: 12) {
                 Text("내 지갑 주소").font(.headline).padding(.top, 24)
-                QRCodeView(content: wallet.address, size: 240)
+                QRCodeView(content: wallet.address, size: 220)
                 Text(wallet.address)
                     .font(.caption.monospaced())
                     .padding(.horizontal, 24)

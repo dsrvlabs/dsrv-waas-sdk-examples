@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'dsrv_wallet_sdk'
-  s.version          = '0.9.0'
+  s.version          = '0.9.1'
   s.summary          = 'DSRV MPC Wallet SDK for Flutter'
   s.description      = 'Flutter plugin for DSRV MPC-based non-custodial wallet'
   s.homepage         = 'https://dsrv.com'

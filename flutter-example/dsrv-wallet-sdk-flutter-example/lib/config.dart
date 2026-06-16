@@ -21,4 +21,26 @@ class AppConfig {
     'DSRV_API_BASE_URL',
     defaultValue: 'https://api.dsrv.com',
   );
+
+  /// 잔액 조회 / 읽기 전용 호출용 공용 RPC 엔드포인트 — chainId 별.
+  /// 환경(dev/staging/prod) 분리·장애 대응을 위해 `--dart-define` 으로 덮어쓸 수 있다:
+  ///   --dart-define=RPC_URL_1=https://my-mainnet-rpc
+  static const Map<String, String> rpcUrls = {
+    '11155111': String.fromEnvironment(
+      'RPC_URL_11155111',
+      defaultValue: 'https://ethereum-sepolia-rpc.publicnode.com',
+    ),
+    '84532': String.fromEnvironment(
+      'RPC_URL_84532',
+      defaultValue: 'https://sepolia.base.org',
+    ),
+    '1': String.fromEnvironment(
+      'RPC_URL_1',
+      defaultValue: 'https://ethereum-rpc.publicnode.com',
+    ),
+    '8453': String.fromEnvironment(
+      'RPC_URL_8453',
+      defaultValue: 'https://mainnet.base.org',
+    ),
+  };
 }

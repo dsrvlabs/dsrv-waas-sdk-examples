@@ -80,6 +80,7 @@ fun TransferSection(modifier: Modifier = Modifier) {
     var balanceText by remember(token, chainId, address) { mutableStateOf<String?>(null) }
     var balanceLoading by remember(token, chainId, address) { mutableStateOf(false) }
     var balanceError by remember(token, chainId, address) { mutableStateOf<String?>(null) }
+    var krwText by remember(token, chainId, address) { mutableStateOf<String?>(null) }
     val nativeDecimals = 18
 
     fun refreshBalance() {
@@ -93,23 +94,29 @@ fun TransferSection(modifier: Modifier = Modifier) {
         }
         balanceError = null
         balanceLoading = true
+        krwText = null
         scope.launch {
-            runCatching {
+            val result = runCatching {
                 if (token == "ETH") {
                     val bi = balanceClient.getNativeBalance(chainId, address)
-                    fromBaseUnits(bi, nativeDecimals) + " ETH"
+                    fromBaseUnits(bi, nativeDecimals)
                 } else {
                     val info = tokenInfo ?: throw IllegalStateException("토큰 정보 없음")
                     val bi = balanceClient.getErc20Balance(chainId, info.address, address)
-                    fromBaseUnits(bi, info.decimals) + " $token"
+                    fromBaseUnits(bi, info.decimals)
                 }
-            }.onSuccess {
-                balanceText = it
-                balanceLoading = false
-            }.onFailure {
+            }
+            val human = result.getOrElse {
                 balanceError = it.message ?: "조회 실패"
                 balanceLoading = false
+                return@launch
             }
+            balanceText = "$human $token"
+            balanceLoading = false
+            // KRW 환산은 잔액 line 과 독립 — getKrwValue 는 실패 시 null 을 반환하므로 balanceError 를 건드리지 않는다.
+            // suspend 함수이므로 onSuccess 람다가 아닌 launch 본문에서 직접 호출한다.
+            val contract = if (token == "ETH") null else tokenInfo?.address
+            krwText = wallet.getKrwValue(chainId, contract, human)
         }
     }
 
@@ -135,6 +142,7 @@ fun TransferSection(modifier: Modifier = Modifier) {
 
         BalanceRow(
             balance = balanceText,
+            krw = krwText,
             loading = balanceLoading,
             error = balanceError,
             onRefresh = { refreshBalance() },
@@ -168,10 +176,17 @@ fun TransferSection(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = {
-                if (recipient.isBlank()) wallet.transfer(recipient, amount, token)
-                else confirm = true
+                // 빈 recipient / chain / token 정보 미충족 시 confirm 자체를 열지 않음.
+                // enabled 조건과 중복되지만 race 보호용 가드.
+                if (recipient.isBlank() || chainId.isEmpty()) return@Button
+                if (token != "ETH" && tokenInfo == null) return@Button
+                confirm = true
             },
-            enabled = state.sdkInitialized && !state.transferLoading,
+            enabled = state.sdkInitialized
+                && !state.transferLoading
+                && recipient.isNotBlank()
+                && chainId.isNotEmpty()
+                && (token == "ETH" || tokenInfo != null),
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (state.transferLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -243,6 +258,7 @@ fun TransferSection(modifier: Modifier = Modifier) {
 @Composable
 private fun BalanceRow(
     balance: String?,
+    krw: String?,
     loading: Boolean,
     error: String?,
     onRefresh: () -> Unit,
@@ -268,7 +284,16 @@ private fun BalanceRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
-                balance != null -> Text(balance, style = MaterialTheme.typography.bodyMedium)
+                balance != null -> {
+                    Text(balance, style = MaterialTheme.typography.bodyMedium)
+                    krw?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 else -> Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

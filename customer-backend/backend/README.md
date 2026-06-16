@@ -27,12 +27,17 @@ src/
 ├── auth/           # SDK 등록 (POST /sdk/registration → DSRV Auth via Gateway)
 ├── transfer/       # SDK transfer proxy (POST /sdk/transfer/build-hash, /broadcast → WaaS via Gateway)
 ├── payment/        # Topup 결제 (POST /payments → stablecoin Payments via Gateway)
+├── asset/          # Price Hub 자산 가치 조회 (GET /asset/latest-value-by-chain → Price Hub)
 ├── health/         # 헬스 체크
 ├── well-known/     # Passkey 도메인 검증 (AASA / assetlinks)
-├── common/         # 공통 유틸리티 (인터셉터, 필터)
+├── common/         # 공통 유틸리티 (인터셉터, 필터, HTTPS_PROXY axios wire-up)
 ├── app.module.ts   # 메인 앱 모듈
 └── main.ts         # 애플리케이션 엔트리포인트
 ```
+
+### Outbound 네트워크 (HTTPS_PROXY)
+
+`HTTPS_PROXY` / `HTTP_PROXY` 환경변수가 설정되면 `common/http/configure-proxy.ts` 가 axios 의 outbound 호출 (Gateway / Price Hub 등) 을 해당 proxy 로 라우팅합니다. 진단을 위해 부팅 시 1줄 마스킹된 로그 + outbound 실패 시 별도 로그를 남깁니다.
 
 ## 환경 설정
 

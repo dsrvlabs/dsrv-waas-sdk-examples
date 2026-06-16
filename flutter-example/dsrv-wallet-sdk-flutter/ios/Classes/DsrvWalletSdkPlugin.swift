@@ -95,7 +95,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 chainType: try requiredString(args, "chainType"),
                 label: args["label"] as? String
             )
-            reply(r, result) { ["publicKey": $0.publicKey, "address": $0.address] }
+            reply(r, result) { ["publicKey": $0.publicKey, "address": $0.address, "addressId": $0.addressId] }
 
         case "transfer":
             let r = await DSRVWallet.transfer(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../token_config.dart';
 import '../ui.dart';
 import '../wallet_state.dart';
+import 'qr_scanner_sheet.dart';
 
 /// Android `PaymentSection.kt` / iOS `PaymentSection.swift` 대응 —
 /// customer-backend `POST /payments` 호출 (Topup 결제).
@@ -147,7 +148,20 @@ class _PaymentSectionState extends State<PaymentSection> {
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
           ],
         ],
-        Field(_toController, 'to (SETTLEMENT 지갑)'),
+        Row(
+          children: [
+            Expanded(child: Field(_toController, 'to (SETTLEMENT 지갑)')),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () async {
+                final to = await scanRecipient(context);
+                if (!mounted || to == null) return;
+                _toController.text = to;
+              },
+              child: const Text('QR 스캔'),
+            ),
+          ],
+        ),
         TextField(
           controller: _amountController,
           decoration: InputDecoration(
@@ -164,12 +178,12 @@ class _PaymentSectionState extends State<PaymentSection> {
         AsyncButton(
           title: '거래 확인',
           isEnabled: wallet.initialized &&
-              wallet.address.isNotEmpty &&
+              wallet.publicKey.isNotEmpty &&
               tokenInfo != null &&
-              _toController.text.isNotEmpty,
+              _toController.text.trim().isNotEmpty,
           isLoading: wallet.busy('pay'),
           onPressed: () {
-            if (tokenInfo == null || _toController.text.isEmpty) return;
+            if (tokenInfo == null || _toController.text.trim().isEmpty) return;
             _confirmAndPay(
               chainId: chainId ?? '',
               tokenInfo: tokenInfo,

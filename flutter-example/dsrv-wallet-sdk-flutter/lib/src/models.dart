@@ -7,12 +7,19 @@
 class KeyCreateResult {
   final String publicKey; // 0x04-prefixed uncompressed
   final String address; // 0x-prefixed EVM 주소
+  /// WaaS 의 address 등록 ID. customer backend 호출 시 path / body param 으로 사용.
+  final String addressId;
 
-  const KeyCreateResult({required this.publicKey, required this.address});
+  const KeyCreateResult({
+    required this.publicKey,
+    required this.address,
+    required this.addressId,
+  });
 
   factory KeyCreateResult.fromMap(Map<dynamic, dynamic> map) => KeyCreateResult(
         publicKey: map['publicKey'] as String,
         address: map['address'] as String,
+        addressId: map['addressId'] as String,
       );
 }
 

@@ -7,6 +7,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { TransferModule } from './transfer/transfer.module';
 import { WellKnownController } from './well-known/well-known.controller';
 import { PaymentModule } from './payment/payment.module';
+import { AssetModule } from './asset/asset.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PaymentModule } from './payment/payment.module';
     TransactionsModule,
     TransferModule,
     PaymentModule,
+    AssetModule,
   ],
   controllers: [AuthController, HealthController, WellKnownController],
   providers: [AuthService],

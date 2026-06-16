@@ -73,7 +73,7 @@ class AccountSection extends StatelessWidget {
                 _showLabelDialog(
                   context: context,
                   title: '새 지갑',
-                  onConfirm: (_) => wallet.createAddress(),
+                  onConfirm: (label) => wallet.createAddress(label: label),
                 );
               },
             ),

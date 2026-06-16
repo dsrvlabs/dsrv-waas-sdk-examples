@@ -2713,9 +2713,54 @@
             ]
           },
           {
+            "kind": "Var",
+            "name": "addressId",
+            "printedName": "addressId",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19dsrv_wallet_sdk_ios15KeyCreateResultV9addressIdSSvp",
+            "mangledName": "$s19dsrv_wallet_sdk_ios15KeyCreateResultV9addressIdSSvp",
+            "moduleName": "dsrv_wallet_sdk_ios",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19dsrv_wallet_sdk_ios15KeyCreateResultV9addressIdSSvg",
+                "mangledName": "$s19dsrv_wallet_sdk_ios15KeyCreateResultV9addressIdSSvg",
+                "moduleName": "dsrv_wallet_sdk_ios",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
             "kind": "Constructor",
             "name": "init",
-            "printedName": "init(publicKey:address:)",
+            "printedName": "init(publicKey:address:addressId:)",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -2734,11 +2779,17 @@
                 "name": "String",
                 "printedName": "Swift.String",
                 "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
               }
             ],
             "declKind": "Constructor",
-            "usr": "s:19dsrv_wallet_sdk_ios15KeyCreateResultV06publicE07addressACSS_SStcfc",
-            "mangledName": "$s19dsrv_wallet_sdk_ios15KeyCreateResultV06publicE07addressACSS_SStcfc",
+            "usr": "s:19dsrv_wallet_sdk_ios15KeyCreateResultV06publicE07address0I2IdACSS_S2Stcfc",
+            "mangledName": "$s19dsrv_wallet_sdk_ios15KeyCreateResultV06publicE07address0I2IdACSS_S2Stcfc",
             "moduleName": "dsrv_wallet_sdk_ios",
             "declAttributes": [
               "AccessControl"
@@ -7618,7 +7669,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/DSRVWallet.swift",
       "kind": "Array",
-      "offset": 40389,
+      "offset": 41055,
       "length": 2,
       "value": "[]"
     },
@@ -7660,21 +7711,21 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Models.swift",
       "kind": "StringLiteral",
-      "offset": 309,
+      "offset": 493,
       "length": 9,
       "value": "\"PENDING\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Models.swift",
       "kind": "StringLiteral",
-      "offset": 339,
+      "offset": 523,
       "length": 11,
       "value": "\"BACKED_UP\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Models.swift",
       "kind": "StringLiteral",
-      "offset": 369,
+      "offset": 553,
       "length": 8,
       "value": "\"FAILED\""
     }

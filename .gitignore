@@ -57,3 +57,6 @@ flutter/dsrv-wallet-sdk-flutter/android/src/main/jniLibs/
 .claude/
 claudedocs/
 CROSS_PLATFORM_AUDIT.md
+
+# Delivery packages (generated via git archive)
+delivery/

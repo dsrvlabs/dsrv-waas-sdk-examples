@@ -177,6 +177,11 @@ final class Wallet: ObservableObject {
         uiState.logs.append(line)
     }
 
+    /// View 에서 in-app 로그에 한 줄을 기록할 수 있게 노출한다.
+    func log(_ message: String) {
+        addLog(message)
+    }
+
     func clearLogs() {
         uiState.logs = []
     }
@@ -529,6 +534,50 @@ final class Wallet: ObservableObject {
                 addLog("✗ getTransactionHistory FAILED: \(error)")
             }
         }
+    }
+
+    // MARK: - 자산 가치 (KRW 환산)
+
+    /// 보유분 KRW 환산값 — 포맷된 "₩..." 문자열, 시세 미가용/실패 시 nil.
+    /// 잔액 RPC 조회는 View 가, 가치 조회+포맷은 여기서 담당한다 (Android `Wallet.getKrwValue` 와 동일).
+    /// 자체 do/catch 로 실패를 흡수하므로 호출 측 잔액 표시 흐름과 독립적이다.
+    func getKrwValue(chainId: String, contractAddress: String?, amount: String) async -> String? {
+        let contractLabel = (contractAddress?.isEmpty == false) ? contractAddress! : "NATIVE"
+        do {
+            // 잔액 0 → 0개 × 단가 = ₩0. 백엔드는 amount=0 이면 holdings 를 생략하므로 직접 표시.
+            if (Decimal(string: amount) ?? .zero) == .zero {
+                return formatKrw("0")
+            }
+            let repo = AssetValueRepository(backendUrl: customerBackendUrl)
+            let value = try await repo.getLatestValue(
+                chainId: chainId,
+                contractAddress: contractAddress,
+                amount: amount
+            )
+            guard let total = value.holdings?.totalValue else {
+                log("⚠ KRW 시세 미가용: chainId=\(chainId) contract=\(contractLabel)")
+                return nil
+            }
+            return formatKrw(total)
+        } catch {
+            log("✗ KRW 환산 실패: chainId=\(chainId) contract=\(contractLabel) — \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    // totalValue 는 BigDecimal 문자열 — Double 변환 없이 Decimal 로 파싱해 정밀도 손실을 피한다.
+    private func formatKrw(_ value: String) -> String {
+        let decimal = Decimal(string: value) ?? .zero
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        formatter.usesGroupingSeparator = true
+        // 기본값 .halfEven 은 0.005→0.00 으로 내려 Android(HALF_UP)/Flutter(수동 half-up) 와 어긋난다.
+        formatter.roundingMode = .halfUp
+        let formatted = formatter.string(from: NSDecimalNumber(decimal: decimal)) ?? value
+        return "₩" + formatted
     }
 
     // MARK: - Backup / Restore

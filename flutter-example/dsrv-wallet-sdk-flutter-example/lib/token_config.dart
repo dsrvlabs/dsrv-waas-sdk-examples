@@ -4,6 +4,8 @@
 /// / iOS [`TokenConfig.swift`](../../ios/dsrv-wallet-sdk-ios-example/dsrv-wallet-sdk-ios-example/Models/TokenConfig.swift) 와 동일한 데이터를 둔다.
 library;
 
+import 'config.dart';
+
 class TokenInfo {
   final String name;
   final String symbol;
@@ -78,4 +80,22 @@ class TokenConfig {
 
   static List<String> getAvailableTokenSymbols(String chainId) =>
       getTokensForChain(chainId).keys.toList();
+
+  /// chainId 에 대응되는 공용 RPC 엔드포인트 URL.
+  /// 잔액 조회 / 읽기 전용 호출용 — 트랜잭션 전송은 SDK 가 별도 처리.
+  /// 엔드포인트는 [AppConfig.rpcUrls] 에서 주입받는다 (`--dart-define=RPC_URL_<chainId>` 로 덮어쓰기 가능).
+  static String? getRpcUrl(String chainId) => AppConfig.rpcUrls[chainId];
+}
+
+/// base units BigInt → 사람이 읽는 십진 표기. 뒤쪽 0 은 trim, 정수면 "." 도 제거.
+///
+/// Android [`Amount.kt`](../../android/dsrv-wallet-sdk-android-example/app/src/main/java/com/dsrv/wallet/example/wallet/model/Amount.kt) `fromBaseUnits` 대응.
+/// fromBaseUnits(BigInt.parse("100000"), 6) == "0.1"
+/// fromBaseUnits(BigInt.parse("1000000"), 6) == "1"
+String fromBaseUnits(BigInt amount, int decimals) {
+  if (decimals <= 0) return amount.toString();
+  final s = amount.toString().padLeft(decimals + 1, '0');
+  final whole = s.substring(0, s.length - decimals);
+  final frac = s.substring(s.length - decimals).replaceFirst(RegExp(r'0+$'), '');
+  return frac.isEmpty ? whole : '$whole.$frac';
 }

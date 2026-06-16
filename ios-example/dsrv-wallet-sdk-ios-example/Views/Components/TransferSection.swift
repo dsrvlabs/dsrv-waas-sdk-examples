@@ -13,6 +13,8 @@ struct TransferSection: View {
     @State private var balanceText: String? = nil
     @State private var balanceLoading = false
     @State private var balanceError: String? = nil
+    @State private var krwValueText: String? = nil
+    @State private var refreshGeneration = 0
 
     private let balanceClient = BalanceClient()
 
@@ -60,15 +62,20 @@ struct TransferSection: View {
             .textFieldStyle(.roundedBorder)
 
             Button {
-                if recipient.trimmingCharacters(in: .whitespaces).isEmpty {
-                    wallet.transfer(recipientInput: recipient, amountInput: amount, tokenSymbol: token)
-                } else {
-                    confirmOpen = true
-                }
+                // 빈 recipient / chain / token 정보 미충족 시 confirm 자체를 열지 않음.
+                // disabled 조건과 중복되지만 race 보호용 가드.
+                let trimmed = recipient.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty, !chainId.isEmpty else { return }
+                if token != "ETH", tokenInfo == nil { return }
+                confirmOpen = true
             } label: {
                 buttonLabel("거래 확인", loading: wallet.uiState.transferLoading, style: .filled)
             }
-            .disabled(!wallet.uiState.sdkInitialized || wallet.uiState.transferLoading)
+            .disabled(!wallet.uiState.sdkInitialized
+                      || wallet.uiState.transferLoading
+                      || recipient.trimmingCharacters(in: .whitespaces).isEmpty
+                      || chainId.isEmpty
+                      || (token != "ETH" && tokenInfo == nil))
 
             if let hash = wallet.uiState.lastTxHash {
                 Text("✓ 전송 완료").font(.caption).foregroundColor(.green)
@@ -144,6 +151,9 @@ struct TransferSection: View {
                 } else {
                     Text("—").font(.footnote).foregroundStyle(.secondary)
                 }
+                if !balanceLoading, balanceError == nil, let krw = krwValueText {
+                    Text(krw).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             Button("새로고침") { Task { await refreshBalance() } }
@@ -153,12 +163,16 @@ struct TransferSection: View {
     }
 
     private func refreshBalance() async {
+        refreshGeneration += 1
+        let gen = refreshGeneration
+        krwValueText = nil
         if chainId.isEmpty || wallet.address.isEmpty {
             balanceText = nil
-            balanceError = chainId.isEmpty || wallet.address.isEmpty ? "체인·지갑 없음" : nil
+            balanceError = "체인·지갑 없음"
             return
         }
         if TokenConfig.getRpcUrl(chainId) == nil {
+            balanceText = nil
             balanceError = "이 체인의 RPC 가 등록되지 않았습니다"
             return
         }
@@ -166,20 +180,37 @@ struct TransferSection: View {
         balanceError = nil
         do {
             let display: String
+            let humanized: String
+            let contractAddress: String?
             if token == "ETH" {
                 let raw = try await balanceClient.getNativeBalance(chainId: chainId, address: wallet.address)
-                display = fromBaseUnits(raw, decimals: 18) + " ETH"
+                humanized = fromBaseUnits(raw, decimals: 18)
+                display = humanized + " ETH"
+                contractAddress = nil
             } else if let info = tokenInfo {
                 let raw = try await balanceClient.getErc20Balance(chainId: chainId, tokenAddress: info.address, ownerAddress: wallet.address)
-                display = fromBaseUnits(raw, decimals: info.decimals) + " \(token)"
+                humanized = fromBaseUnits(raw, decimals: info.decimals)
+                display = humanized + " \(token)"
+                contractAddress = info.address
             } else {
                 throw BalanceClient.BalanceError.malformedResponse("토큰 정보 없음")
             }
+            guard gen == refreshGeneration else { return }
+            // onchain 잔액은 즉시 렌더하고 spinner 를 끈다. KRW 환산/포맷은 Wallet 에 위임한다.
             balanceText = display
+            balanceLoading = false
+            let krw = await wallet.getKrwValue(
+                chainId: chainId,
+                contractAddress: contractAddress,
+                amount: humanized
+            )
+            guard gen == refreshGeneration else { return }
+            krwValueText = krw
         } catch {
+            guard gen == refreshGeneration else { return }
             balanceError = error.localizedDescription
+            balanceLoading = false
         }
-        balanceLoading = false
     }
 }
 

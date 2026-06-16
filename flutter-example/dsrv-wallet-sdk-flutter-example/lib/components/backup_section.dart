@@ -51,15 +51,6 @@ class BackupSection extends StatelessWidget {
             child: const Text('Backup 전체 삭제'),
           ),
         ),
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed:
-                wallet.busy('clearDeviceKey') ? null : wallet.clearDeviceKey,
-            child: const Text('Clear Device Key (debug)'),
-          ),
-        ),
         if (wallet.backupDump != null && wallet.backupDump!.isNotEmpty)
           Container(
             width: double.infinity,
