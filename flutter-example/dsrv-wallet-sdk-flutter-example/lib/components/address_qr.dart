@@ -13,10 +13,16 @@ class AddressQr extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
-      child: QrImageView(
-        data: content,
-        size: size,
-        backgroundColor: Colors.white,
+      // QrImageView 를 명시 크기 SizedBox 로 감싼다 — qr_flutter 4.1.0 은 bounded 크기 박스가 없으면
+      // 다이얼로그/Column 안에서 "Cannot hit test a render box with no size" 를 던진다.
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: QrImageView(
+          data: content,
+          size: size,
+          backgroundColor: Colors.white,
+        ),
       ),
     );
   }

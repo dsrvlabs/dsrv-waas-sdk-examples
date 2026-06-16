@@ -22,6 +22,12 @@ class AppConfig {
     defaultValue: 'https://api.dsrv.com',
   );
 
+  /// Passkey 백업/복원의 WebAuthn relying party 도메인 — 발급/운영 도메인으로 교체하세요.
+  static const String backupRpId = String.fromEnvironment(
+    'BACKUP_RP_ID',
+    defaultValue: 'your-backend.com',
+  );
+
   /// 잔액 조회 / 읽기 전용 호출용 공용 RPC 엔드포인트 — chainId 별.
   /// 환경(dev/staging/prod) 분리·장애 대응을 위해 `--dart-define` 으로 덮어쓸 수 있다:
   ///   --dart-define=RPC_URL_1=https://my-mainnet-rpc

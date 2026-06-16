@@ -4,6 +4,11 @@ import axios, { AxiosError } from 'axios';
 
 import { GetLatestValueByChainRequestDto } from './dto/get-latest-value-by-chain-request.dto';
 import {
+  AccountAssetItemDto,
+  AccountAssetsPaginationDto,
+  GetAccountAssetsResponseDto,
+} from './dto/get-account-assets-response.dto';
+import {
   AssetByChainInfoDto,
   HoldingsDto,
   LatestPriceDataDto,
@@ -28,6 +33,11 @@ import {
  */
 @Injectable()
 export class AssetService {
+  /** WaaS BasePageRequest 의 limit 상한 (@Max(100)). 한 페이지로 최대 100개. */
+  private static readonly WAAS_MAX_LIMIT = 100;
+  /** total 이상이라도 무한루프 방지용 페이지 상한 (100 * 50 = 5000개). */
+  private static readonly MAX_PAGES = 50;
+
   private readonly logger = new Logger(AssetService.name);
   private readonly dsrvApiBaseUrl: string;
   private readonly apiKey: string;
@@ -95,6 +105,120 @@ export class AssetService {
     } catch (error) {
       this.throwUpstreamError(error, 'price-hub latest-value query failed');
     }
+  }
+
+  /**
+   * WaaS NCW 계정 자산 목록 조회 — accountId 로 스코핑 (userId·addressId 불필요).
+   *
+   * <p>WaaS endpoint:
+   * {@code GET /api/v1/embedded-wallets/ncw/accounts/{accountId}/assets?page=&limit=100}
+   * — projectId(passport) + accountId 로 스코핑(IDOR 방지). 계정에 속한 모든 주소의 잔고를
+   * (chain, asset) 단위로 합산한다. 응답은 {@code PagedList<AccountAssetInfo>} ({@code items[] + pagination}).
+   *
+   * <p>{@code /users/{userId}/...} endpoint 를 쓰지 않는 이유: path 의 userId 는 auth 내부
+   * EndUser UUID 라서 SDK/앱이 알 수 없는 값 (transactions 프록시와 동일 이유). 앱이 이미
+   * 가진 accountId 로 조회한다.
+   *
+   * <p><b>전체 목록 보장</b>: limit=100 으로 받고 {@code pagination.total > 100} 이면 다음
+   * 페이지를 이어 받아 모두 합쳐 반환한다 (앱은 페이지네이션 없이 전체 자산을 드롭다운에 노출).
+   */
+  async getAccountAssetList(
+    accountId: string,
+  ): Promise<GetAccountAssetsResponseDto> {
+    const url =
+      `${this.dsrvApiBaseUrl}/waas/api/v1/embedded-wallets/ncw/accounts/` +
+      `${encodeURIComponent(accountId)}/assets`;
+
+    const all: AccountAssetItemDto[] = [];
+    let page = 1;
+    let total = 0;
+
+    try {
+      do {
+        const pageResult = await this.fetchAssetPage(url, page);
+        all.push(...pageResult.items);
+        total = pageResult.pagination.total;
+        page += 1;
+      } while (all.length < total && page <= AssetService.MAX_PAGES);
+
+      if (all.length < total) {
+        this.logger.warn(
+          `asset.account-list:truncated collected=${all.length} total=${total} accountId=${accountId}`,
+        );
+      }
+      this.logger.log(
+        `asset.account-list:ok accountId=${accountId} count=${all.length} total=${total}`,
+      );
+      return { items: all, pagination: { page: 1, limit: all.length, total } };
+    } catch (error) {
+      this.throwUpstreamError(error, 'WaaS account assets query failed');
+    }
+  }
+
+  /** 단일 페이지 조회 — balance 정밀도 보존을 위해 text 로 받아 안전 파싱. */
+  private async fetchAssetPage(
+    url: string,
+    page: number,
+  ): Promise<{
+    items: AccountAssetItemDto[];
+    pagination: AccountAssetsPaginationDto;
+  }> {
+    const response = await axios.get<string>(url, {
+      headers: this.axiosHeaders.headers,
+      params: {
+        page: String(page),
+        limit: String(AssetService.WAAS_MAX_LIMIT),
+      },
+      // balance(raw BigInteger)의 JS number 정밀도 손실 방지: text 로 받아 직접 파싱한다.
+      responseType: 'text',
+      transformResponse: (data) => data,
+      timeout: 15_000,
+    });
+
+    const parsed = this.parseBalanceSafeJson(response.data);
+    // WaaS envelope: { requestId, data: { items, pagination } } — fallback to direct payload.
+    const payload = (parsed?.data ?? parsed) as Record<string, unknown>;
+    const rawItems = payload?.items as
+      | Array<Record<string, unknown>>
+      | undefined;
+    const pagination = payload?.pagination as
+      | AccountAssetsPaginationDto
+      | undefined;
+    if (!Array.isArray(rawItems) || !pagination) {
+      const preview =
+        typeof response.data === 'string'
+          ? response.data.slice(0, 500)
+          : JSON.stringify(response.data);
+      this.logger.error(`asset.account-list:invalid-schema body=${preview}`);
+      throw new HttpException(
+        'WaaS account assets response missing items/pagination',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const items: AccountAssetItemDto[] = rawItems.map((it) => {
+      // symbol 은 WaaS 가 제공할 때만 통과(옵션) — 없으면 앱이 price-hub 로 보완. decimals 는 통과 안 함.
+      const symbol = it.symbol;
+      return {
+        chainId: String(it.chainId),
+        chainType: String(it.chainType),
+        // native 코인은 WaaS 가 contractAddress 를 생략(@JsonInclude NON_DEFAULT) → null 정규화.
+        contractAddress:
+          (it.contractAddress as string | null | undefined) ?? null,
+        balance: it.balance == null ? '0' : String(it.balance),
+        ...(typeof symbol === 'string' && symbol.length > 0 ? { symbol } : {}),
+      };
+    });
+    return { items, pagination };
+  }
+
+  /**
+   * balance(raw BigInteger)의 JS number 정밀도 손실 방지 — {@code JSON.parse} 전에 "balance"
+   * number literal 을 string 으로 감싼다. page/limit/total 은 작은 count 라 number 로 둔다.
+   */
+  private parseBalanceSafeJson(text: string): Record<string, unknown> {
+    const safe = text.replace(/("balance"\s*:\s*)(-?\d+)/g, '$1"$2"');
+    return JSON.parse(safe) as Record<string, unknown>;
   }
 
   private throwUpstreamError(error: unknown, defaultMsg: string): never {

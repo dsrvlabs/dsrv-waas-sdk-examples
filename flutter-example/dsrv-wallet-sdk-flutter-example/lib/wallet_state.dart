@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:dsrv_wallet_sdk/dsrv_wallet_sdk.dart';
 
+import 'account_asset_repository.dart';
 import 'asset_value_repository.dart';
 import 'config.dart';
 import 'backend_auth_handler.dart';
 import 'payment_repository.dart';
-import 'token_config.dart';
 import 'transaction_history_repository.dart';
 import 'transfer_repository.dart';
 import 'user_session.dart';
@@ -63,6 +63,9 @@ class WalletState extends ChangeNotifier {
       backupResult = null;
       restoreResult = null;
       backupDump = null;
+      assets = [];
+      assetsLoading = false;
+      assetsError = null;
       _log('⚙ SDK reset (userId 변경)');
     }
     userId = trimmed;
@@ -99,6 +102,9 @@ class WalletState extends ChangeNotifier {
     backupResult = null;
     restoreResult = null;
     backupDump = null;
+    assets = [];
+    assetsLoading = false;
+    assetsError = null;
     await clearUserId();
     userId = '';
     _log('▶ SDK reset — userId cleared');
@@ -183,6 +189,7 @@ class WalletState extends ChangeNotifier {
               UserCredential(type: CredentialType.userId, value: userUuid),
           authHandler: BackendAuthHandler(AppConfig.customerBackendUrl),
           baseUrl: AppConfig.dsrvApiBaseUrl,
+          rpId: AppConfig.backupRpId,
         );
         initializing = false;
         r.fold((_) {
@@ -295,19 +302,39 @@ class WalletState extends ChangeNotifier {
   late final TransferRepository _transferRepo =
       TransferRepository(AppConfig.customerBackendUrl);
 
-  /// 전송 — 버튼 1회 = 3단계:
+  /// humanized amount ("1.5") + decimals → base units 정수 문자열.
+  /// 정수 연산만 사용해 부동소수점 오차 방지.
+  String _toBaseUnits(String human, int decimals) {
+    final s = human.trim();
+    if (s.isEmpty) return '0';
+    final parts = s.split('.');
+    final intPart = parts[0];
+    final fracPart = parts.length > 1 ? parts[1] : '';
+    final padded = (fracPart.length >= decimals)
+        ? fracPart.substring(0, decimals)
+        : fracPart.padRight(decimals, '0');
+    final combined = (intPart + padded).replaceFirst(RegExp(r'^0+'), '');
+    return combined.isEmpty ? '0' : combined;
+  }
+
+  /// 전송 — 헤더/선택 자산 사용. [amount] 는 사람이 읽는 단위 ("0.001", "1.5").
+  ///
+  /// 버튼 1회 = 3단계:
   ///   1) customer-backend `POST /sdk/transfer/build-hash`  → WaaS build, signId/messageHash/type
   ///   2) [DSRVWallet.sign] (디바이스 MPC sign — proxy 불가)
   ///   3) customer-backend `POST /sdk/transfer/broadcast`    → WaaS broadcast 후 txHash
   ///
   /// build/broadcast 는 customer-backend 가 자체 server-key 로 WaaS 호출 — example 은 user token 미전송.
   ///
-  /// [contractAddress] 가 null 이면 native 전송, 있으면 ERC-20 전송.
+  /// [chainId] 전송 체인 (선택된 자산의 chainId). [contractAddress] 가 null 이면 native 전송,
+  /// 있으면 ERC-20 전송. [decimals] 는 자산 decimals (price-hub 메타). [symbol] 은 로그/표시용.
   Future<void> transfer({
     required String chainId,
     required String recipient,
     required String amount,
     String? contractAddress,
+    required int decimals,
+    String symbol = '',
   }) =>
       _op('transfer', () async {
         transferError = null;
@@ -330,24 +357,31 @@ class WalletState extends ChangeNotifier {
           _log('✗ transfer: recipient empty');
           return;
         }
-        if (amount.isEmpty) {
-          transferError = '금액을 입력하세요';
-          notifyListeners();
-          _log('✗ transfer: amount empty');
-          return;
-        }
         final c = chainId.isEmpty ? (selectedChainId ?? '') : chainId;
         if (c.isEmpty) {
-          transferError = 'chain 을 먼저 선택하세요';
+          transferError = 'chain 을 먼저 선택하세요 (자산을 먼저 선택하세요)';
           notifyListeners();
           _log('✗ transfer: chainId empty');
           return;
         }
         final to = recipient;
-        final amt = amount;
+
+        final isNative = contractAddress == null || contractAddress.isEmpty;
+        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
+        if (!isNative && decimals <= 0) {
+          transferError = '자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요.';
+          notifyListeners();
+          _log('✗ transfer: token decimals unknown (0)');
+          return;
+        }
+        final defaultHuman = isNative ? '0.001' : '1';
+        final humanAmount = amount.trim().isEmpty ? defaultHuman : amount.trim();
+        final amt = _toBaseUnits(humanAmount, decimals);
 
         transferError = null;
-        _log('▶ transfer(chainId=$c, to=${to.substring(0, 10)}…, amount=$amount)');
+        final label = symbol.isEmpty ? (isNative ? 'native' : 'token') : symbol;
+        _log('▶ transfer($label, chainId=$c, to=${to.substring(0, 10)}…, amount=$humanAmount → $amt base)');
 
         try {
           // ── 1) customer-backend build ─────────────────────────────
@@ -355,7 +389,7 @@ class WalletState extends ChangeNotifier {
           final build = await _transferRepo.buildHash(BuildTransferRequest(
             fromAddress: address,
             toAddress: to,
-            amount: amount,
+            amount: amt,
             chainId: c,
             contractAddress: contractAddress,
           ));
@@ -440,13 +474,100 @@ class WalletState extends ChangeNotifier {
         }
       });
 
+  // ===== 자산 목록 (WaaS — RPC 직접호출 대체) =====
+
+  late final AccountAssetRepository _accountAssetRepo =
+      AccountAssetRepository(AppConfig.customerBackendUrl);
+
+  /// 선택 계정/체인의 자산 목록 (공용 상태) — 전송 드롭다운/자산조회/결제 공용.
+  /// 선택·KRW 같은 화면별 상태는 각 View 가 보관하고, 목록/로딩/에러만 여기서 관리한다.
+  List<AssetRow> assets = [];
+  bool assetsLoading = false;
+  String? assetsError;
+
+  /// 빠른 체인/계정 전환 시 stale 응답이 덮어쓰지 않도록 두는 세대 가드.
+  int _assetsLoadGeneration = 0;
+
+  /// 선택 계정/체인의 자산 목록을 조회해 [assets] 에 보관 (공용 상태). 화면(전송 드롭다운/
+  /// 자산조회/결제)은 [assets] 를 관찰하고 선택·KRW 같은 화면별 상태만 각자 들고 있는다.
+  /// [fetchAssetRows] 를 그대로 감싸며, 세대 가드로 늦은 응답을 무시한다.
+  Future<void> loadAssets() async {
+    final gen = ++_assetsLoadGeneration;
+    assetsLoading = true;
+    assetsError = null;
+    notifyListeners();
+    try {
+      final rows = await fetchAssetRows();
+      if (gen != _assetsLoadGeneration) return;
+      assets = rows;
+      assetsLoading = false;
+      notifyListeners();
+    } catch (e) {
+      if (gen != _assetsLoadGeneration) return;
+      assets = [];
+      assetsError = '$e';
+      assetsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 선택된 계정(accountId)의 자산 목록을 조회해 드롭다운용 [AssetRow] 로 만든다.
+  ///
+  /// 흐름: (1) customer-backend `GET /sdk/asset/accounts/{accountId}` 로
+  /// 보유 자산 + raw 잔고(+가능 시 symbol) 조회 → (2) 자산별 price-hub `by-chain/latest-value` 로
+  /// decimals(+없는 symbol) 메타 조회 → (3) decimals 로 휴머나이즈. WaaS 자산 API 는 decimals 를 주지 않으므로
+  /// 메타는 price-hub 에서 가져온다. ETH/USDC 하드코딩(`TokenConfig`)·RPC(`BalanceClient`) 제거.
+  Future<List<AssetRow>> fetchAssetRows() async {
+    final accountId = selectedAccountId;
+    if (accountId == null || accountId.isEmpty) {
+      throw Exception('계정을 먼저 선택하세요 (getAccountList)');
+    }
+    final resp = await _accountAssetRepo.getAccountAssets(accountId: accountId);
+
+    // 계정 자산 API 는 계정의 '모든 주소·체인' 잔고를 합산 반환하므로 선택된 체인으로 필터.
+    final chainId = selectedChainId ?? '';
+    // 선택된 체인의 자산만 — 메타(symbol/decimals)는 price-hub 에서 1건씩 조회 (자산 수는 보통 한 자릿수).
+    final rows = <AssetRow>[];
+    for (final item in resp.items.where((it) => it.chainId == chainId)) {
+      rows.add(await _buildAssetRow(item));
+    }
+    // native 를 먼저, 그다음 심볼 사전순.
+    rows.sort((a, b) {
+      if (a.isNative != b.isNative) return a.isNative ? -1 : 1;
+      return a.symbol.toLowerCase().compareTo(b.symbol.toLowerCase());
+    });
+    return rows;
+  }
+
+  /// 자산 1건 → [AssetRow]. symbol 은 WaaS([item.symbol]) 우선, 없으면 price-hub 로 보완하고
+  /// decimals 는 항상 price-hub 에서 받는다. price-hub 메타가 없으면(미지원/실패) [buildAssetRow] 가
+  /// native 는 18, 토큰은 decimals 미상(0, raw 표시)으로 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(graceful).
+  Future<AssetRow> _buildAssetRow(AccountAssetItem item) async {
+    try {
+      final meta = await _assetValueRepo.getLatestValue(
+        chainId: item.chainId,
+        contractAddress: item.contractAddress,
+        amount: '0',
+      );
+      return buildAssetRow(
+        item,
+        symbol: meta.asset.symbol,
+        name: meta.asset.name,
+        decimals: meta.asset.decimals,
+      );
+    } catch (_) {
+      // price-hub 미지원/실패 — 폴백 값(native 18 / token 0) 사용.
+      return buildAssetRow(item);
+    }
+  }
+
   // ===== Asset value (KRW 환산) =====
 
   late final AssetValueRepository _assetValueRepo =
       AssetValueRepository(AppConfig.customerBackendUrl);
 
   /// 보유분 KRW 환산값 — 포맷된 "₩..." 문자열, 시세 미가용/실패 시 null.
-  /// 잔액 RPC 조회는 View 가, 가치 조회+포맷은 여기서 담당한다 (Android `Wallet.getKrwValue` 와 동일).
+  /// 잔액·자산 조회는 View 가(`fetchAssetRows`), 가치 조회+포맷은 여기서 담당한다 (Android `Wallet.getKrwValue` 와 동일).
   /// 자체 try/catch 로 실패를 흡수하므로 호출 측 잔액 표시 흐름과 독립적이다.
   Future<String?> getKrwValue({
     required String chainId,
@@ -605,7 +726,7 @@ class WalletState extends ChangeNotifier {
   ///
   /// 비어 있는 입력은 default 채움: sourceUserId=userUuid (raw userId 시드의 결정적 UUID —
   /// WaaS 가 topup wallet 등록 시 external_user_ref 로 박는 값과 일치), chainId=selectedChainId,
-  /// token=USDC, from=address, paymentType=0
+  /// from=address, paymentType=0. [token] (컨트랙트 주소)은 PaymentSection 이 선택 자산에서 전달 — 필수.
   Future<void> pay({
     String chainId = '',
     String token = '',
@@ -636,17 +757,12 @@ class WalletState extends ChangeNotifier {
           paymentError = 'chainId 정수 변환 실패: $c';
           return;
         }
-        final String resolvedToken;
+        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
         if (token.isEmpty) {
-          final usdc = TokenConfig.getToken(c, 'USDC');
-          if (usdc == null) {
-            paymentError = 'chainId=$c 의 USDC 주소가 정의되지 않았습니다. token 직접 입력';
-            return;
-          }
-          resolvedToken = usdc.address;
-        } else {
-          resolvedToken = token;
+          paymentError = 'token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)';
+          return;
         }
+        final resolvedToken = token;
 
         paymentResult = null;
         paymentError = null;

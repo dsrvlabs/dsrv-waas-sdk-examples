@@ -462,7 +462,7 @@
           {
             "kind": "Function",
             "name": "initialize",
-            "printedName": "initialize(sdkId:userCredential:authHandler:baseUrl:)",
+            "printedName": "initialize(sdkId:userCredential:authHandler:baseUrl:rpId:)",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -500,11 +500,26 @@
                 "name": "String",
                 "printedName": "Swift.String",
                 "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "hasDefaultArg": true,
+                "usr": "s:Sq"
               }
             ],
             "declKind": "Func",
-            "usr": "s:19dsrv_wallet_sdk_ios10DSRVWalletO10initialize0C2Id14userCredential11authHandler7baseUrlAA12WalletResultOyytGSS_AA04UserI0VAA04AuthK0_pSStYaFZ",
-            "mangledName": "$s19dsrv_wallet_sdk_ios10DSRVWalletO10initialize0C2Id14userCredential11authHandler7baseUrlAA12WalletResultOyytGSS_AA04UserI0VAA04AuthK0_pSStYaFZ",
+            "usr": "s:19dsrv_wallet_sdk_ios10DSRVWalletO10initialize0C2Id14userCredential11authHandler7baseUrl02rpG0AA12WalletResultOyytGSS_AA04UserI0VAA04AuthK0_pS2SSgtYaFZ",
+            "mangledName": "$s19dsrv_wallet_sdk_ios10DSRVWalletO10initialize0C2Id14userCredential11authHandler7baseUrl02rpG0AA12WalletResultOyytGSS_AA04UserI0VAA04AuthK0_pS2SSgtYaFZ",
             "moduleName": "dsrv_wallet_sdk_ios",
             "static": true,
             "declAttributes": [
@@ -7228,21 +7243,14 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/backup\/PasskeyBackupRepository.swift",
       "kind": "StringLiteral",
-      "offset": 1002,
-      "length": 27,
-      "value": "\"customer.api.dev.dsrv.com\""
-    },
-    {
-      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/backup\/PasskeyBackupRepository.swift",
-      "kind": "StringLiteral",
-      "offset": 1062,
+      "offset": 1149,
       "length": 13,
       "value": "\"DSRV Wallet\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/backup\/PasskeyBackupRepository.swift",
       "kind": "StringLiteral",
-      "offset": 1107,
+      "offset": 1194,
       "length": 20,
       "value": "\"dsrv-sdk-backup-v1\""
     },
@@ -7415,6 +7423,13 @@
       "value": "\"\""
     },
     {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/config\/SdkRuntime.swift",
+      "kind": "StringLiteral",
+      "offset": 712,
+      "length": 2,
+      "value": "\"\""
+    },
+    {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/delegation\/DelegationOperations.swift",
       "kind": "StringLiteral",
       "offset": 69,
@@ -7504,6 +7519,13 @@
       "offset": 3339,
       "length": 6,
       "value": "\"POST\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/HttpUtil.swift",
+      "kind": "BooleanLiteral",
+      "offset": 9751,
+      "length": 5,
+      "value": "false"
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/util\/SecureEnclaveCrypto.swift",
@@ -7669,7 +7691,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/DSRVWallet.swift",
       "kind": "Array",
-      "offset": 41055,
+      "offset": 41453,
       "length": 2,
       "value": "[]"
     },

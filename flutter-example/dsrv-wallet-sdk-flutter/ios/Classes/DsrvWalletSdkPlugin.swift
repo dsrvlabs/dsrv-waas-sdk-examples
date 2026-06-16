@@ -66,7 +66,8 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 sdkId: try requiredString(args, "sdkId"),
                 userCredential: credential,
                 authHandler: DartAuthHandler(channel: channel),
-                baseUrl: try requiredString(args, "baseUrl")
+                baseUrl: try requiredString(args, "baseUrl"),
+                rpId: args["rpId"] as? String
             )
             reply(r, result) { _ in nil }
 

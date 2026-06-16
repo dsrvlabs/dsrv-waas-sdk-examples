@@ -21,7 +21,7 @@ public enum DSRVWallet {
     get
   }
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func initialize(sdkId: Swift.String, userCredential: dsrv_wallet_sdk_ios.UserCredential, authHandler: any dsrv_wallet_sdk_ios.AuthHandler, baseUrl: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<Swift.Void>
+  nonisolated(nonsending) public static func initialize(sdkId: Swift.String, userCredential: dsrv_wallet_sdk_ios.UserCredential, authHandler: any dsrv_wallet_sdk_ios.AuthHandler, baseUrl: Swift.String, rpId: Swift.String? = nil) async -> dsrv_wallet_sdk_ios.WalletResult<Swift.Void>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
   nonisolated(nonsending) public static func createAccount(label: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.AccountResult>

@@ -19,16 +19,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,17 +38,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dsrv.wallet.example.wallet.config.TokenConfig
-import com.dsrv.wallet.example.wallet.config.TokenInfo
 import com.dsrv.wallet.example.wallet.model.Wallet
+import kotlinx.coroutines.launch
 
 /**
  * customer-backend `POST /payments` 호출 — Topup 결제 흐름.
  *
- * UI 는 [TransferSection] 과 동일한 패턴 — chain 자동(selectedChainId), 토큰은 segmented row 로
- * ERC-20 토큰 목록(예: USDC) 노출. amount 는 사람 읽는 단위(humanized, 예: "1.5") 그대로 전송 —
- * wei 변환은 stablecoin Payments 측이 담당. paymentType=0, sourceUserId=wallet.userId 는
- * [Wallet.pay] 가 자동 채움.
+ * 결제(topup)는 stablecoin Payments 레일이라 **USDC 전용**입니다 (native·기타 토큰은 upstream
+ * `CreateQuoteRequest` 가 ERC-20 컨트랙트 주소를 강제 — 미지원). 따라서 토큰은 USDC 로 고정
+ * (체인별 컨트랙트 주소 하드코딩), 잔액은 공용 [Wallet.uiState] 자산목록에서 USDC 를 찾아 표시,
+ * KRW 는 price-hub. chainId/token(USDC 주소)은 여기서, paymentType=0/sourceUserId/from 은 [Wallet.pay] 가 채움.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,88 +55,156 @@ fun PaymentSection(modifier: Modifier = Modifier) {
     val wallet: Wallet = viewModel()
     val state = wallet.uiState
     val lifecycleOwner = LocalContext.current as LifecycleOwner
+    val scope = rememberCoroutineScope()
+    val address = wallet.addressText
 
-    val chain = state.chains.firstOrNull { it.chainId == state.selectedChainId }
     val chainId = state.selectedChainId.orEmpty()
+    val chain = state.chains.firstOrNull { it.chainId == chainId }
+    // 결제 토큰 = 선택 체인의 USDC (하드코딩). stablecoin 측이 USDC 만 허용.
+    val usdcAddr = usdcAddress(chainId)
 
-    // ERC-20 토큰 목록 — 결제는 native(ETH) 결제가 의미 없으므로 ERC-20 만 노출.
-    val tokens: List<String> = remember(chainId) { TokenConfig.getAvailableTokenSymbols(chainId) }
-    var tokenIndex by remember(chainId) { mutableIntStateOf(0) }
-    val safeIndex = tokenIndex.coerceIn(0, (tokens.size - 1).coerceAtLeast(0))
-    val token = tokens.getOrNull(safeIndex)
-    val tokenInfo: TokenInfo? = if (token != null) TokenConfig.getToken(chainId, token) else null
+    // 자산 목록/로딩/에러는 공용 상태(uiState)에서 관찰. KRW 만 이 컴포저블이 보관.
+    val loading = state.assetsLoading
+    val loadError = state.assetsError
+    // 보유 USDC (공용 자산목록에서 컨트랙트 주소로 매칭). 미보유면 null → 잔액 0 표시.
+    val usdc = usdcAddr?.let { addr ->
+        state.assets.firstOrNull { it.contractAddress?.equals(addr, ignoreCase = true) == true }
+    }
+    var krwText by remember { mutableStateOf<String?>(null) }
+    var krwLoading by remember { mutableStateOf(false) }
+    // 빠른 체인/계정 전환·연속 새로고침 시 이전 응답이 현재 KRW 를 덮어쓰지 못하게 하는 가드 (iOS/Flutter 동일).
+    var krwGeneration by remember { mutableStateOf(0) }
+
+    val balanceDisplay = usdc?.humanizedBalance ?: "0"
 
     var to by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     var scanner by remember { mutableStateOf(false) }
 
+    /** 공용 목록 갱신 시 USDC 잔액 기준 KRW 환산 (미보유면 "0" → ₩0). */
+    suspend fun refreshKrw() {
+        krwGeneration += 1
+        val gen = krwGeneration
+        krwText = null
+        if (usdcAddr == null) {
+            krwLoading = false
+            return
+        }
+        krwLoading = true
+        val amt = usdc?.humanizedBalance ?: "0"
+        val krw = wallet.getKrwValue(chainId, usdcAddr, amt)
+        if (gen != krwGeneration) return
+        krwText = krw
+        krwLoading = false
+    }
+
+    // 최초 표시 + 주소/계정/체인 변경 시 공용 목록 적재.
+    LaunchedEffect(address, state.selectedAccountId, state.selectedChainId) { wallet.loadAssets() }
+    // 공용 목록 갱신 시 USDC 잔액 기준 KRW 재환산.
+    LaunchedEffect(state.assets) { refreshKrw() }
+
     SectionContainer(
         title = "결제 (Topup)",
-        subtitle = "체인 ${chain?.name ?: "없음"} · ${token ?: "토큰 없음"}",
+        subtitle = "체인 ${chain?.name ?: chainId.ifEmpty { "없음" }} · USDC",
         modifier = modifier,
     ) {
-        if (tokens.isEmpty()) {
-            Text(
-                "이 체인에 정의된 ERC-20 토큰이 없습니다 (TokenConfig 확인)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        } else {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                tokens.forEachIndexed { i, t ->
-                    SegmentedButton(
-                        selected = safeIndex == i,
-                        onClick = { tokenIndex = i },
-                        shape = SegmentedButtonDefaults.itemShape(index = i, count = tokens.size),
-                    ) { Text(t) }
+        if (usdcAddr != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "USDC 잔액",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    when {
+                        loading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(6.dp))
+                            Text("조회 중…", style = MaterialTheme.typography.bodySmall)
+                        }
+                        loadError != null -> Text(
+                            loadError,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        else -> Text("$balanceDisplay USDC", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    when {
+                        krwLoading -> Text(
+                            "환산 중…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        krwText != null -> Text(
+                            krwText!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+                TextButton(onClick = { scope.launch { wallet.loadAssets() } }, enabled = !loading) { Text("새로고침") }
             }
+
             Spacer(Modifier.height(8.dp))
-            TokenInfoCard(tokenInfo)
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = to,
-                onValueChange = { to = it },
-                label = { Text("to (SETTLEMENT 지갑)") },
-                placeholder = { Text("0x…") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
+            Text(
+                usdcAddr,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             )
-            TextButton(onClick = { scanner = true }) { Text("QR 스캔") }
-        }
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = amount,
-            onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-            label = { Text("금액 (${token ?: "토큰"}, 기본 1)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(10.dp))
 
-        Button(
-            onClick = {
-                if (to.isBlank() || tokenInfo == null) return@Button
-                confirm = true
-            },
-            enabled = state.sdkInitialized
-                && wallet.publicKey.isNotEmpty()
-                && tokenInfo != null
-                && to.isNotBlank()
-                && !state.paymentLoading,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (state.paymentLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            else Text("거래 확인")
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = to,
+                    onValueChange = { to = it },
+                    label = { Text("to (SETTLEMENT 지갑)") },
+                    placeholder = { Text("0x…") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { scanner = true }) { Text("QR 스캔") }
+            }
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                label = { Text("금액 (USDC, 기본 1)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+
+            Button(
+                onClick = {
+                    if (to.isBlank()) return@Button
+                    confirm = true
+                },
+                enabled = state.sdkInitialized
+                    && wallet.publicKey.isNotEmpty()
+                    && to.isNotBlank()
+                    && !state.paymentLoading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (state.paymentLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text("거래 확인")
+            }
+        } else {
+            Text(
+                "이 체인은 USDC topup 을 지원하지 않습니다",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            )
         }
 
         state.paymentResult?.let { r ->
@@ -204,16 +269,15 @@ fun PaymentSection(modifier: Modifier = Modifier) {
 
     if (confirm) {
         val effectiveAmount = amount.trim().ifEmpty { "1" }
-        val info = tokenInfo
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text("결제 확인") },
             text = {
                 Column {
                     ConfirmRow("받는 사람", to, mono = true)
-                    ConfirmRow("금액", "$effectiveAmount ${token ?: ""}")
-                    info?.address?.let { ConfirmRow("토큰", it, mono = true) }
-                    chain?.name?.let { ConfirmRow("체인", it) }
+                    ConfirmRow("금액", "$effectiveAmount USDC")
+                    usdcAddr?.let { ConfirmRow("토큰", it, mono = true) }
+                    (chain?.name ?: chainId.ifEmpty { null })?.let { ConfirmRow("체인", it) }
                     Spacer(Modifier.height(10.dp))
                     Text(
                         "⚠ 결제 후 되돌릴 수 없습니다.",
@@ -225,12 +289,12 @@ fun PaymentSection(modifier: Modifier = Modifier) {
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false
-                    if (info != null) {
+                    if (usdcAddr != null) {
                         // amount 는 humanized 그대로 전송 — stablecoin Payments 가 decimals 변환 담당.
                         wallet.pay(
                             toInput = to,
                             chainIdInput = chainId,
-                            tokenInput = info.address,
+                            tokenInput = usdcAddr,
                             amountInput = effectiveAmount,
                         )
                     }
@@ -241,39 +305,11 @@ fun PaymentSection(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun TokenInfoCard(tokenInfo: TokenInfo?) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-        if (tokenInfo != null) {
-            Text(
-                "${tokenInfo.name} · decimals ${tokenInfo.decimals}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(tokenInfo.address, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-private fun ConfirmRow(label: String, value: String, mono: Boolean = false) {
-    Row(modifier = Modifier.padding(vertical = 3.dp)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(80.dp),
-        )
-        Text(value, style = MaterialTheme.typography.labelMedium)
-    }
-}
-
-/** `ethereum:0x…@chainId/…?…` 같은 EIP-681 URI 에서 순수 address 만 추출. */
-private fun parseRecipient(content: String): String {
-    val raw = content.trim()
-    if (raw.startsWith("ethereum:", ignoreCase = true)) {
-        val rest = raw.substring("ethereum:".length)
-        return rest.substringBefore("@").substringBefore("/").substringBefore("?")
-    }
-    return raw
+/** 체인별 USDC 컨트랙트 주소 (topup 전용 하드코딩). 미지원 체인은 null. */
+private fun usdcAddress(chainId: String): String? = when (chainId) {
+    "11155111" -> "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"  // Ethereum Sepolia
+    "84532" -> "0x036CbD53842c5426634e7929541eC2318f3dCF7e"     // Base Sepolia
+    "1" -> "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"          // Ethereum Mainnet
+    "8453" -> "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"       // Base Mainnet
+    else -> null
 }

@@ -14,11 +14,15 @@ class DSRVWallet {
   /// SDK 초기화 및 인증.
   ///
   /// [authHandler] 는 native 가 challenge 를 요청할 때 역방향 호출된다.
+  /// [rpId] 는 Passkey 백업 (Tier A — iOS 18+ / Android 14+) 의 WebAuthn relying party
+  /// 도메인. Tier B 만 가능한 기기 (iOS 14-17 / Android 8-13) 에서는 무관해 null 허용.
+  /// Tier A 가능한 기기에서 null/empty 면 [backup] / [restore] 호출 시 명시 에러로 surface.
   static Future<WalletResult<void>> initialize({
     required String sdkId,
     required UserCredential userCredential,
     required AuthHandler authHandler,
     required String baseUrl,
+    String? rpId,
     int? cloudProjectNumber,
   }) async {
     NativeBridge.setAuthHandler(authHandler);
@@ -29,6 +33,7 @@ class DSRVWallet {
         'credentialValue': userCredential.value,
         'provider': userCredential.provider,
         'baseUrl': baseUrl,
+        if (rpId != null) 'rpId': rpId,
         if (cloudProjectNumber != null) 'cloudProjectNumber': cloudProjectNumber,
       });
       return null;

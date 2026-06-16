@@ -84,6 +84,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 val r = DSRVWallet.initialize(
                     appContext, sdkId, credential, dartAuthHandler(),
                     baseUrl = call.arg("baseUrl"),
+                    rpId = call.argument<String>("rpId"),
                     cloudProjectNumber = call.argument<Number>("cloudProjectNumber")?.toLong()
                 )
                 r.reply(result) { null }

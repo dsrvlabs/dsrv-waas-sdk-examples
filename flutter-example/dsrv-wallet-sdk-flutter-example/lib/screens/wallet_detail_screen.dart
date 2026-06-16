@@ -154,6 +154,8 @@ class WalletDetailScreen extends StatelessWidget {
     final items = <_FeatureItem>[
       _FeatureItem(FeatureKind.query, Icons.account_balance_wallet_outlined,
           '지갑 조회', '지갑 주소·체인 정보'),
+      _FeatureItem(FeatureKind.assetQuery, Icons.list_alt_outlined, '자산 조회',
+          '보유 자산 목록 조회'),
       _FeatureItem(FeatureKind.smartAccount, Icons.verified_user_outlined,
           '스마트어카운트', '위임(EIP-7702) · 승인'),
       _FeatureItem(FeatureKind.backup, Icons.backup_outlined, '백업 / 복원',

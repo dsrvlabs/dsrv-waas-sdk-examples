@@ -28,6 +28,10 @@ android {
 
         val sdkId: String = project.findProperty("SDK_ID") as? String ?: "your-sdk-id"
         buildConfigField("String", "SDK_ID", "\"$sdkId\"")
+
+        // Passkey(WebAuthn) relying party ID — 발급/운영 도메인으로 교체하세요.
+        val backupRpId: String = project.findProperty("BACKUP_RP_ID") as? String ?: "your-backend.com"
+        buildConfigField("String", "BACKUP_RP_ID", "\"$backupRpId\"")
     }
 
     compileOptions {

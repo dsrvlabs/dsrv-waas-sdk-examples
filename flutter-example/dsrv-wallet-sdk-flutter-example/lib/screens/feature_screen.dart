@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../components/address_qr.dart';
 import '../components/approve_section.dart';
+import '../components/asset_list_view.dart';
 import '../components/backup_section.dart';
 import '../components/delegate_section.dart';
 import '../components/history_section.dart';
@@ -14,11 +15,21 @@ import '../ui.dart';
 import '../wallet_state.dart';
 
 /// Android `AppScreen.Feature` 대응 — 지갑 상세에서 진입하는 기능별 화면.
-enum FeatureKind { query, smartAccount, backup, transfer, history, payment, log }
+enum FeatureKind {
+  query,
+  assetQuery,
+  smartAccount,
+  backup,
+  transfer,
+  history,
+  payment,
+  log
+}
 
 extension FeatureKindTitle on FeatureKind {
   String get title => switch (this) {
         FeatureKind.query => '지갑 조회',
+        FeatureKind.assetQuery => '자산 조회',
         FeatureKind.smartAccount => '스마트어카운트',
         FeatureKind.backup => '백업 / 복원',
         FeatureKind.transfer => '전송',
@@ -68,6 +79,8 @@ class FeatureScreen extends StatelessWidget {
     switch (feature) {
       case FeatureKind.query:
         return [_QueryFeature(wallet: wallet)];
+      case FeatureKind.assetQuery:
+        return [AssetListView(wallet: wallet)];
       case FeatureKind.smartAccount:
         return [
           DelegateSection(wallet: wallet),
@@ -166,7 +179,7 @@ class _QueryFeature extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
         ],
-        Text('ⓘ 잔액 조회는 RPC 직접 호출이 필요합니다.',
+        Text("ⓘ 잔액·자산은 '전송' 탭에서 자산 목록으로 조회합니다 (WaaS 자산 API).",
             style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor)),
       ],
     );

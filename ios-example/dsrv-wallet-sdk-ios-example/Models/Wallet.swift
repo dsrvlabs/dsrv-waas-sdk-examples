@@ -7,8 +7,11 @@ import dsrv_wallet_sdk_ios
 public enum Config {
     public static let customerBackendURL = "https://your-backend.com"
     public static let sdkId = "your-sdk-id"
-    /// nil 이면 SDK 기본값 사용
     public static let dsrvApiBaseUrl: String = "https://api.dsrv.com"
+
+    /// Passkey 백업/복원의 WebAuthn relying party 도메인 — 발급/운영 도메인으로 교체하세요.
+    /// 같은 cloud account 의 device 간 backup 복원이 같은 namespace 에서 가능하려면 모든 빌드가 동일 값을 써야 함.
+    public static let backupRpId: String = "your-backend.com"
 }
 
 struct WalletUiState {
@@ -72,6 +75,12 @@ struct WalletUiState {
     var historyItems: [TransactionHistoryItem] = []
     var historyTotal: Int = 0
     var historyPage: Int = 0
+
+    // Asset list (WaaS getAccountAssets, 선택 체인 필터) — 전송 드롭다운/자산조회/결제 공용.
+    // 선택·KRW 같은 화면별 상태는 각 View 가 보관하고, 목록/로딩/에러만 여기서 관리한다.
+    var assets: [AssetRow] = []
+    var assetsLoading: Bool = false
+    var assetsError: String? = nil
 
     // Logs
     var logs: [String] = []
@@ -203,7 +212,8 @@ final class Wallet: ObservableObject {
             sdkId: sdkId,
             userCredential: userCredential,
             authHandler: handler,
-            baseUrl: Config.dsrvApiBaseUrl
+            baseUrl: Config.dsrvApiBaseUrl,
+            rpId: Config.backupRpId
         )
 
         switch result {
@@ -387,8 +397,18 @@ final class Wallet: ObservableObject {
     ///
     /// build/broadcast 는 customer-backend 가 자체 server-key 로 WaaS 호출 — example 은 user token 미전송.
     ///
-    /// @param tokenSymbol "ETH" (native) 또는 TokenConfig 에 정의된 ERC-20 심볼 (예: "USDC")
-    func transfer(recipientInput: String, amountInput: String, tokenSymbol: String = "ETH") {
+    /// @param chainId         전송 체인 (선택된 자산의 chainId)
+    /// @param contractAddress ERC-20 컨트랙트 주소. native 코인은 nil
+    /// @param decimals        자산 decimals (price-hub 메타에서 획득)
+    /// @param symbol          로그/표시용 심볼
+    func transfer(
+        recipientInput: String,
+        amountInput: String,
+        chainId: String,
+        contractAddress: String?,
+        decimals: Int,
+        symbol: String = ""
+    ) {
         guard uiState.sdkInitialized else {
             uiState.transferError = "SDK가 초기화되지 않았습니다"
             return
@@ -398,29 +418,24 @@ final class Wallet: ObservableObject {
             uiState.transferError = "address 가 필요합니다"
             return
         }
-        let chainId = uiState.selectedChainId ?? demoChainIdFallback
+        if chainId.isEmpty {
+            uiState.transferError = "chainId 가 필요합니다 (자산을 먼저 선택하세요)"
+            return
+        }
         if recipientInput.trimmingCharacters(in: .whitespaces).isEmpty {
             uiState.transferError = "수신 주소를 입력하세요"
             return
         }
         let recipient = recipientInput
 
-        let contractAddress: String?
-        let decimals: Int
-        let defaultHuman: String
-        if tokenSymbol == "ETH" {
-            contractAddress = nil
-            decimals = 18
-            defaultHuman = "0.001"
-        } else {
-            guard let token = TokenConfig.getToken(chainId: chainId, symbol: tokenSymbol) else {
-                uiState.transferError = "chainId=\(chainId) 에 정의된 \(tokenSymbol) 이 없습니다 (설정에서 추가)"
-                return
-            }
-            contractAddress = token.address
-            decimals = token.decimals
-            defaultHuman = "1"
+        let isNative = contractAddress?.isEmpty ?? true
+        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
+        if !isNative, decimals <= 0 {
+            uiState.transferError = "자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요."
+            return
         }
+        let defaultHuman = isNative ? "0.001" : "1"
         let humanAmount = amountInput.trimmingCharacters(in: .whitespaces).isEmpty ? defaultHuman : amountInput
         let amount: String
         do {
@@ -432,7 +447,7 @@ final class Wallet: ObservableObject {
 
         uiState.transferLoading = true
         uiState.transferError = nil
-        addLog("▶ transfer(\(tokenSymbol), chainId=\(chainId), to=\(recipient.prefix(10))…, amount=\(humanAmount) → \(amount) base)")
+        addLog("▶ transfer(\(symbol.isEmpty ? (isNative ? "native" : "token") : symbol), chainId=\(chainId), to=\(recipient.prefix(10))…, amount=\(humanAmount) → \(amount) base)")
 
         let repo = TransferRepository(backendUrl: customerBackendUrl)
 
@@ -533,6 +548,115 @@ final class Wallet: ObservableObject {
                 uiState.historyError = "\(error)"
                 addLog("✗ getTransactionHistory FAILED: \(error)")
             }
+        }
+    }
+
+    // MARK: - 자산 목록 (WaaS — RPC 직접호출 대체)
+
+    enum AssetError: LocalizedError {
+        case notReady(String)
+        var errorDescription: String? {
+            switch self { case .notReady(let m): return m }
+        }
+    }
+
+    private var assetsLoadGeneration = 0
+
+    /// 선택 계정/체인의 자산 목록을 조회해 `uiState.assets` 에 보관 (공용 상태). 화면(전송 드롭다운/
+    /// 자산조회/결제)은 `uiState.assets` 를 관찰하고 선택·KRW 같은 화면별 상태만 각자 들고 있는다.
+    /// 빠른 체인/계정 전환 시 stale 응답이 덮어쓰지 않도록 세대 가드를 둔다.
+    func loadAssets() async {
+        assetsLoadGeneration += 1
+        let gen = assetsLoadGeneration
+        uiState.assetsLoading = true
+        uiState.assetsError = nil
+        do {
+            let rows = try await fetchAssetRows()
+            guard gen == assetsLoadGeneration else { return }
+            uiState.assets = rows
+            uiState.assetsLoading = false
+        } catch {
+            guard gen == assetsLoadGeneration else { return }
+            uiState.assets = []
+            uiState.assetsError = error.localizedDescription
+            uiState.assetsLoading = false
+        }
+    }
+
+    /// 선택된 계정(accountId)의 자산 목록을 조회해 드롭다운용 `AssetRow` 로 만든다 (선택 체인 필터).
+    ///
+    /// 흐름: (1) customer-backend `GET /sdk/asset/accounts/{accountId}` 로 계정의 모든 주소·체인
+    /// 잔고(합산) 조회 → (2) 자산별 price-hub `by-chain/latest-value` 로 decimals(+없는 symbol) 보완
+    /// → (3) decimals 로 휴머나이즈. symbol 은 WaaS 가 주면 우선, decimals 는 WaaS 가 안 줘서 price-hub.
+    /// ETH/USDC 하드코딩(`TokenConfig`)·RPC(`BalanceClient`) 제거.
+    func fetchAssetRows() async throws -> [AssetRow] {
+        guard let accountId = uiState.selectedAccountId, !accountId.isEmpty else {
+            throw AssetError.notReady("계정을 먼저 선택하세요 (getAccountList)")
+        }
+        // 계정 자산 API 는 계정의 '모든 주소·체인' 잔고를 합산 반환하므로 선택된 체인으로 필터.
+        let chainId = uiState.selectedChainId ?? ""
+        let backend = customerBackendUrl
+        let listRepo = AccountAssetRepository(backendUrl: backend)
+        let resp = try await listRepo.getAccountAssets(accountId: accountId)
+
+        let valueRepo = AssetValueRepository(backendUrl: backend)
+        // 선택된 체인의 자산만 — symbol 은 WaaS 가 주면 우선, decimals(+없는 symbol)는 price-hub 보완.
+        var rows: [AssetRow] = []
+        for item in resp.items where item.chainId == chainId {
+            rows.append(await buildAssetRow(item: item, valueRepo: valueRepo))
+        }
+        // native 를 먼저, 그다음 심볼 사전순.
+        return rows.sorted { lhs, rhs in
+            if lhs.isNative != rhs.isNative { return lhs.isNative }
+            return lhs.symbol.localizedCaseInsensitiveCompare(rhs.symbol) == .orderedAscending
+        }
+    }
+
+    /// 자산 1건 → `AssetRow`. price-hub 메타가 없으면(미지원/실패) native 는 18, 토큰은 decimals
+    /// 미상(0, raw 표시)으로 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
+    func buildAssetRow(item: AccountAssetItem, valueRepo: AssetValueRepository) async -> AssetRow {
+        let isNative = item.contractAddress?.isEmpty ?? true
+        // 심볼 우선순위: ① WaaS(item.symbol, 정확) ② price-hub ③ 체인 계열 fallback(EVM→ETH).
+        let waasSymbol = item.symbol?.trimmingCharacters(in: .whitespaces)
+        let hasWaasSymbol = !(waasSymbol?.isEmpty ?? true)
+        let fallbackSymbol = isNative ? Wallet.nativeFallbackSymbol(chainType: item.chainType) : "TOKEN"
+        var symbol = hasWaasSymbol ? waasSymbol!.uppercased() : fallbackSymbol
+        var name = symbol
+        var decimals = isNative ? 18 : 0
+        do {
+            // decimals 는 WaaS 가 안 주므로 항상 price-hub 에서 받는다. symbol 은 WaaS 가 없을 때만 보완.
+            let meta = try await valueRepo.getLatestValue(
+                chainId: item.chainId,
+                contractAddress: item.contractAddress,
+                amount: nil
+            )
+            if !hasWaasSymbol {
+                let metaSymbol = meta.asset.symbol.trimmingCharacters(in: .whitespaces)
+                if !metaSymbol.isEmpty { symbol = metaSymbol.uppercased() }
+            }
+            if !meta.asset.name.isEmpty { name = meta.asset.name }
+            decimals = meta.asset.decimals ?? (isNative ? 18 : 0)
+        } catch {
+            // price-hub 미지원/실패 — symbol 은 위에서 정한 값(WaaS or fallback), decimals 는 fallback 유지.
+        }
+        let humanized = decimals > 0 ? fromBaseUnits(item.balance, decimals: decimals) : item.balance
+        return AssetRow(
+            chainId: item.chainId,
+            contractAddress: isNative ? nil : item.contractAddress,
+            rawBalance: item.balance,
+            symbol: symbol,
+            name: name,
+            decimals: decimals,
+            humanizedBalance: humanized
+        )
+    }
+
+    /// price-hub·WaaS 둘 다 심볼을 못 줄 때 native 코인의 표시 심볼 — 체인 계열 기준.
+    /// 현재 지원 체인은 모두 EVM=ETH. WaaS 가 symbol 을 주면 그 값이 최우선이라 이 fallback 은 거의 안 쓰임.
+    static func nativeFallbackSymbol(chainType: String) -> String {
+        switch chainType.uppercased() {
+        case "SVM", "SOLANA": return "SOL"
+        default: return "ETH"
         }
     }
 
@@ -781,7 +905,7 @@ final class Wallet: ObservableObject {
     ///   sourceUserId → [userUuid] (raw userId 를 시드로 만든 결정적 UUID — WaaS 가 topup
     ///                  wallet 등록 시 external_user_ref 로 박는 값과 동일해야 매칭됨)
     ///   chainId      → 선택된 chain (없으면 demoChainIdFallback)
-    ///   token        → 선택된 chain 의 USDC (TokenConfig)
+    ///   token        → PaymentSection 이 선택한 자산의 컨트랙트 주소 (필수)
     ///   from         → 현재 선택된 지갑 address
     ///   paymentType  → 0
     func pay(
@@ -823,16 +947,11 @@ final class Wallet: ObservableObject {
             uiState.paymentError = "chainId 정수 변환 실패: \(chainIdStr)"
             return
         }
-        let token: String
-        if tokenInput.isEmpty {
-            if let usdc = TokenConfig.getToken(chainId: chainIdStr, symbol: "USDC") {
-                token = usdc.address
-            } else {
-                uiState.paymentError = "chainId=\(chainIdStr) 의 USDC 주소가 정의되지 않았습니다. token 직접 입력"
-                return
-            }
-        } else {
-            token = tokenInput
+        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
+        let token = tokenInput
+        if token.isEmpty {
+            uiState.paymentError = "token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)"
+            return
         }
         let paymentType = Int(paymentTypeInput) ?? 0
 

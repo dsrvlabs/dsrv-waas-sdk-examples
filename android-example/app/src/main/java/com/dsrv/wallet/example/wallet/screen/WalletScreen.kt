@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Backup
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dsrv.wallet.example.wallet.component.AccountSection
 import com.dsrv.wallet.example.wallet.component.ApproveSection
+import com.dsrv.wallet.example.wallet.component.AssetListSection
 import com.dsrv.wallet.example.wallet.component.BackupSection
 import com.dsrv.wallet.example.wallet.component.ChainSection
 import com.dsrv.wallet.example.wallet.component.DelegateSection
@@ -85,6 +87,7 @@ private sealed class AppScreen {
 
     sealed class Feature(val title: String) : AppScreen() {
         data object Query : Feature("지갑 조회")
+        data object AssetQuery : Feature("자산 조회")
         data object SmartAccount : Feature("스마트어카운트")
         data object Backup : Feature("백업 / 복원")
         data object Transfer : Feature("전송")
@@ -443,6 +446,7 @@ private data class FeatureItem(
 
 private val FEATURE_ITEMS = listOf(
     FeatureItem(AppScreen.Feature.Query, Icons.Outlined.AccountBalanceWallet, "지갑 주소·체인 정보"),
+    FeatureItem(AppScreen.Feature.AssetQuery, Icons.AutoMirrored.Outlined.ListAlt, "보유 자산 목록 조회"),
     FeatureItem(AppScreen.Feature.SmartAccount, Icons.Outlined.VerifiedUser, "위임(EIP-7702) · 승인"),
     FeatureItem(AppScreen.Feature.Backup, Icons.Outlined.Backup, "백업 · 복원 · 키 갱신"),
     FeatureItem(AppScreen.Feature.Transfer, Icons.AutoMirrored.Outlined.Send, "ETH · ERC-20 전송"),
@@ -510,6 +514,7 @@ private fun FeatureScreen(feature: AppScreen.Feature, onBack: () -> Unit) {
             ) {
                 when (feature) {
                     AppScreen.Feature.Query -> QueryFeature()
+                    AppScreen.Feature.AssetQuery -> AssetQueryFeature()
                     AppScreen.Feature.SmartAccount -> SmartAccountFeature()
                     AppScreen.Feature.Backup -> BackupFeature()
                     AppScreen.Feature.Transfer -> TransferFeature()
@@ -580,10 +585,16 @@ private fun QueryFeature() {
 
     Spacer(Modifier.height(16.dp))
     Text(
-        "ⓘ 잔액 조회는 RPC 직접 호출이 필요합니다.",
+        "ⓘ 보유 자산·잔액은 '자산 조회' 탭에서 확인합니다 (WaaS 자산 API).",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+// ── 자산 조회 (보유 자산 전체를 리스트로 — 드롭다운 아님) ─────────────
+@Composable
+private fun AssetQueryFeature() {
+    AssetListSection()
 }
 
 // ── 스마트어카운트 ─────────────────────────────────────────────────

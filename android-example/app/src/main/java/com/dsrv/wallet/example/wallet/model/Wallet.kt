@@ -13,11 +13,15 @@ import com.dsrv.wallet.example.BuildConfig
 import com.dsrv.wallet.sdk.CredentialType
 import com.dsrv.wallet.sdk.DSRVWallet
 import com.dsrv.wallet.sdk.UserCredential
-import com.dsrv.wallet.example.wallet.config.TokenConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -133,6 +137,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     userCredential = userCredential,
                     authHandler = authHandler,
                     baseUrl = dsrvApiBaseUrl,
+                    rpId = BuildConfig.BACKUP_RP_ID,
                 )
 
                 if (result.isSuccess) {
@@ -357,12 +362,18 @@ class Wallet(application: Application) : AndroidViewModel(application) {
      *
      * build/broadcast 는 customer-backend 가 자체 server-key 로 WaaS 호출 — example 은 user token 미전송.
      *
-     * @param tokenSymbol "ETH" (native) 또는 TokenConfig 에 정의된 ERC-20 심볼 (예: "USDC")
+     * @param chainId         전송 체인 (선택된 자산의 chainId)
+     * @param contractAddress ERC-20 컨트랙트 주소. native 코인은 null
+     * @param decimals        자산 decimals (price-hub 메타에서 획득)
+     * @param symbol          로그/표시용 심볼
      */
     fun transfer(
         recipientInput: String,
         amountInput: String,
-        tokenSymbol: String = "ETH",
+        chainId: String,
+        contractAddress: String?,
+        decimals: Int,
+        symbol: String = "",
     ) {
         if (!uiState.sdkInitialized) {
             uiState = uiState.copy(transferError = "SDK가 초기화되지 않았습니다")
@@ -373,23 +384,24 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(transferError = "address 가 필요합니다")
             return
         }
-        val chainId = uiState.selectedChainId ?: DEMO_CHAIN_ID_FALLBACK
+        if (chainId.isEmpty()) {
+            uiState = uiState.copy(transferError = "chainId 가 필요합니다 (자산을 먼저 선택하세요)")
+            return
+        }
         if (recipientInput.isBlank()) {
             uiState = uiState.copy(transferError = "수신 주소를 입력하세요")
             return
         }
         val recipient = recipientInput
 
-        // 토큰 종류에 따라 contractAddress + decimals + 기본값 결정
-        val (contractAddress, decimals, defaultHuman) = if (tokenSymbol == "ETH") {
-            Triple<String?, Int, String>(null, 18, "0.001")
-        } else {
-            val token = TokenConfig.getToken(chainId, tokenSymbol) ?: run {
-                uiState = uiState.copy(transferError = "chainId=$chainId 에 정의된 $tokenSymbol 이 없습니다 (설정에서 추가)")
-                return
-            }
-            Triple<String?, Int, String>(token.address, token.decimals, "1")
+        val isNative = contractAddress.isNullOrEmpty()
+        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
+        if (!isNative && decimals <= 0) {
+            uiState = uiState.copy(transferError = "자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요.")
+            return
         }
+        val defaultHuman = if (isNative) "0.001" else "1"
         val humanAmount = amountInput.trim().ifEmpty { defaultHuman }
         val amount = runCatching { toBaseUnits(humanAmount, decimals) }
             .getOrElse {
@@ -398,7 +410,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             }
 
         uiState = uiState.copy(transferLoading = true, transferError = null)
-        addLog("▶ transfer($tokenSymbol, chainId=$chainId, to=${recipient.take(10)}…, amount=$humanAmount → $amount base)")
+        val label = symbol.ifEmpty { if (isNative) "native" else "token" }
+        addLog("▶ transfer($label, chainId=$chainId, to=${recipient.take(10)}…, amount=$humanAmount → $amount base)")
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -461,6 +474,123 @@ class Wallet(application: Application) : AndroidViewModel(application) {
 
     private val transactionHistoryRepository by lazy { TransactionHistoryRepository(customerBackendUrl) }
     private val assetValueRepository by lazy { AssetValueRepository(customerBackendUrl) }
+    private val accountAssetRepository by lazy { AccountAssetRepository(customerBackendUrl) }
+
+    // ===== 자산 목록 (WaaS — RPC 직접호출 대체) =====
+
+    // 빠른 체인/계정 전환 시 stale 응답이 공용 목록을 덮어쓰지 않도록 하는 세대 가드.
+    private var assetsLoadGeneration = 0
+
+    /**
+     * 선택 계정/체인의 자산 목록을 조회해 [WalletUiState.assets] 에 보관 (공용 상태). 화면(전송 드롭다운/
+     * 자산조회/결제)은 `uiState.assets` 를 관찰하고 선택·KRW 같은 화면별 상태만 각자 들고 있는다.
+     * 기존 [fetchAssetRows] 를 그대로 감싸며, 빠른 전환 시 stale 응답을 버리도록 세대 가드를 둔다.
+     */
+    suspend fun loadAssets() {
+        assetsLoadGeneration += 1
+        val gen = assetsLoadGeneration
+        uiState = uiState.copy(assetsLoading = true, assetsError = null)
+        runCatching { fetchAssetRows() }
+            .onSuccess { rows ->
+                if (gen != assetsLoadGeneration) return
+                uiState = uiState.copy(assets = rows, assetsLoading = false)
+            }
+            .onFailure { t ->
+                if (t is CancellationException) throw t  // 정상 취소(체인/계정 전환·화면 이탈)는 에러 아님
+                if (gen != assetsLoadGeneration) return
+                uiState = uiState.copy(
+                    assets = emptyList(),
+                    assetsError = t.message ?: "자산 조회 실패",
+                    assetsLoading = false,
+                )
+            }
+    }
+
+    /**
+     * 선택된 계정(accountId)의 자산 목록을 조회해 드롭다운용 [AssetRow] 로 만든다.
+     *
+     * 흐름: (1) customer-backend `GET /sdk/asset/accounts/{accountId}` 로 보유 자산 + raw 잔고 조회 →
+     * (2) 자산별 price-hub `by-chain/latest-value` 로 (없는 symbol·)decimals 메타 병렬 조회 →
+     * (3) decimals 로 휴머나이즈. symbol 은 WaaS 가 주면 우선 사용하고, decimals(+없는 symbol)는
+     * price-hub 에서 보완한다. ETH/USDC 하드코딩(TokenConfig)·RPC(BalanceClient) 제거.
+     */
+    suspend fun fetchAssetRows(): List<AssetRow> {
+        val accountId = uiState.selectedAccountId?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("계정을 먼저 선택하세요 (getAccountList)")
+
+        // 계정 자산 API 는 계정의 '모든 주소·체인' 잔고를 합산 반환하므로 선택된 체인으로 필터.
+        val chainId = uiState.selectedChainId.orEmpty()
+        val resp = accountAssetRepository.getAccountAssets(accountId = accountId)
+
+        // 선택된 체인의 자산만 — symbol 은 WaaS 가 주면 우선, decimals(+없는 symbol)는 price-hub 보완 (자산 수는 보통 한 자릿수).
+        val rows = coroutineScope {
+            resp.items
+                .filter { it.chainId == chainId }
+                .map { item -> async { buildAssetRow(item) } }
+                .awaitAll()
+        }
+        // native 를 먼저, 그다음 심볼 사전순.
+        return rows.sortedWith(
+            compareByDescending<AssetRow> { it.isNative }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.symbol }
+        )
+    }
+
+    /**
+     * 자산 1건 → [AssetRow]. 심볼 우선순위: ① WaaS([AccountAssetItem.symbol], 정확) ② price-hub
+     * ③ 체인 계열 fallback(native→EVM=ETH, 토큰→"TOKEN"). decimals 는 WaaS 가 주지 않으므로 항상
+     * price-hub 에서 받고, 없으면(미지원/실패) native 는 18, 토큰은 decimals 미상(0, raw 표시)으로
+     * 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
+     */
+    private suspend fun buildAssetRow(item: AccountAssetItem): AssetRow {
+        val isNative = item.contractAddress.isNullOrEmpty()
+        // 심볼 우선순위: ① WaaS(item.symbol) ② price-hub ③ 체인 계열 fallback.
+        val waasSymbol = item.symbol?.trim()
+        val hasWaasSymbol = !waasSymbol.isNullOrEmpty()
+        val fallbackSymbol = if (isNative) nativeFallbackSymbol(item.chainType) else "TOKEN"
+        var symbol = if (hasWaasSymbol) waasSymbol!!.uppercase() else fallbackSymbol
+        var name = symbol
+        var decimals = if (isNative) 18 else 0
+        runCatching {
+            assetValueRepository.getLatestValue(
+                chainId = item.chainId,
+                contractAddress = item.contractAddress,
+                // 메타만 필요 → amount="0" (빈 문자열은 customer-backend DTO 검증에서 400). price-hub 는
+                // amount=0 이면 가격만 반환하고 holdings 는 생략하지만 asset(symbol/decimals)은 그대로 준다.
+                amount = "0",
+            )
+        }.onSuccess { meta ->
+            // decimals 는 WaaS 가 안 주므로 항상 price-hub 에서. symbol 은 WaaS 가 없을 때만 보완(대문자 통일).
+            if (!hasWaasSymbol) {
+                meta.asset.symbol.trim().takeIf { it.isNotEmpty() }?.let { symbol = it.uppercase() }
+            }
+            meta.asset.name.takeIf { it.isNotEmpty() }?.let { name = it }
+            decimals = meta.asset.decimals.takeIf { it > 0 } ?: (if (isNative) 18 else 0)
+        }
+        val humanized = if (decimals > 0) {
+            fromBaseUnits(BigInteger(item.balance.ifEmpty { "0" }), decimals)
+        } else {
+            item.balance
+        }
+        return AssetRow(
+            chainId = item.chainId,
+            contractAddress = if (isNative) null else item.contractAddress,
+            rawBalance = item.balance,
+            symbol = symbol,
+            name = name,
+            decimals = decimals,
+            humanizedBalance = humanized,
+        )
+    }
+
+    /**
+     * price-hub 메타가 없을 때 native 코인의 표시 심볼 — 체인 계열 기준 (price-hub 가 심볼을 주면 그 값 우선).
+     * 현재 지원 체인은 모두 EVM=ETH. 향후 다른 native 체인은 price-hub 시세로 정확히 표기됨.
+     */
+    private fun nativeFallbackSymbol(chainType: String): String = when (chainType.uppercase()) {
+        "SVM", "SOLANA" -> "SOL"
+        else -> "ETH"
+    }
 
     /**
      * 보유 자산의 KRW 환산 가치 조회 — customer-backend `GET /sdk/asset/by-chain/latest-value`.
@@ -760,7 +890,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
      *   sourceUserId → [userUuid] (raw userId 를 시드로 만든 결정적 UUID — WaaS 가 topup
      *                  wallet 등록 시 external_user_ref 로 박는 값과 동일해야 매칭됨)
      *   chainId      → 선택된 chain (없으면 [DEMO_CHAIN_ID_FALLBACK])
-     *   token        → 선택된 chain 의 USDC ([TokenConfig])
+     *   token        → PaymentSection 이 선택한 자산의 컨트랙트 주소 (필수)
      *   from         → 현재 선택된 지갑 [address]
      *   paymentType  → 0
      */
@@ -802,12 +932,11 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(paymentError = "chainId 정수 변환 실패: $chainIdStr")
             return
         }
-        val token = tokenInput.takeIf { it.isNotBlank() }
-            ?: TokenConfig.getToken(chainIdStr, "USDC")?.address
-            ?: run {
-                uiState = uiState.copy(paymentError = "chainId=$chainIdStr 의 USDC 주소가 정의되지 않았습니다. token 직접 입력")
-                return
-            }
+        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
+        val token = tokenInput.takeIf { it.isNotBlank() } ?: run {
+            uiState = uiState.copy(paymentError = "token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)")
+            return
+        }
         val paymentType = paymentTypeInput.takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
 
         val request = PaymentRequest(

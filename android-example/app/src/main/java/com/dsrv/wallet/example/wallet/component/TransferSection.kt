@@ -16,21 +16,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,111 +35,30 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dsrv.wallet.example.wallet.config.TokenConfig
-import com.dsrv.wallet.example.wallet.config.TokenInfo
-import com.dsrv.wallet.example.wallet.model.BalanceClient
+import com.dsrv.wallet.example.wallet.model.AssetRow
 import com.dsrv.wallet.example.wallet.model.Wallet
-import com.dsrv.wallet.example.wallet.model.fromBaseUnits
-import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransferSection(modifier: Modifier = Modifier) {
     val wallet: Wallet = viewModel()
     val state = wallet.uiState
     val lifecycleOwner = LocalContext.current as LifecycleOwner
 
-    val chain = state.chains.firstOrNull { it.chainId == state.selectedChainId }
-    val chainId = state.selectedChainId.orEmpty()
-
-    // 동적 토큰 목록 — ETH (네이티브) + 현재 체인에서 정의된 토큰 (USDC 등)
-    val tokens: List<String> = remember(chainId) {
-        listOf("ETH") + TokenConfig.getAvailableTokenSymbols(chainId)
-    }
-    var tokenIndex by remember(chainId) { mutableIntStateOf(0) }
-    val safeIndex = tokenIndex.coerceIn(0, (tokens.size - 1).coerceAtLeast(0))
-    val token = tokens.getOrNull(safeIndex) ?: "ETH"
-    val tokenInfo: TokenInfo? = if (token == "ETH") null else TokenConfig.getToken(chainId, token)
+    // 자산 드롭다운 + 잔액 + KRW 는 공용 AssetBalanceSection 가 담당. 여기선 선택된 자산만 받아 전송에 사용.
+    var selectedAsset by remember { mutableStateOf<AssetRow?>(null) }
+    val chain = state.chains.firstOrNull { it.chainId == selectedAsset?.chainId }
 
     var recipient by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var scanner by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
 
-    // ===== Balance =====
-    val balanceClient = remember { BalanceClient() }
-    val scope = rememberCoroutineScope()
-    val address = wallet.addressText
-    var balanceText by remember(token, chainId, address) { mutableStateOf<String?>(null) }
-    var balanceLoading by remember(token, chainId, address) { mutableStateOf(false) }
-    var balanceError by remember(token, chainId, address) { mutableStateOf<String?>(null) }
-    var krwText by remember(token, chainId, address) { mutableStateOf<String?>(null) }
-    val nativeDecimals = 18
-
-    fun refreshBalance() {
-        if (chainId.isEmpty() || address.isEmpty()) {
-            balanceError = "체인·지갑 없음"
-            return
-        }
-        if (TokenConfig.getRpcUrl(chainId) == null) {
-            balanceError = "이 체인의 RPC 가 등록되지 않았습니다"
-            return
-        }
-        balanceError = null
-        balanceLoading = true
-        krwText = null
-        scope.launch {
-            val result = runCatching {
-                if (token == "ETH") {
-                    val bi = balanceClient.getNativeBalance(chainId, address)
-                    fromBaseUnits(bi, nativeDecimals)
-                } else {
-                    val info = tokenInfo ?: throw IllegalStateException("토큰 정보 없음")
-                    val bi = balanceClient.getErc20Balance(chainId, info.address, address)
-                    fromBaseUnits(bi, info.decimals)
-                }
-            }
-            val human = result.getOrElse {
-                balanceError = it.message ?: "조회 실패"
-                balanceLoading = false
-                return@launch
-            }
-            balanceText = "$human $token"
-            balanceLoading = false
-            // KRW 환산은 잔액 line 과 독립 — getKrwValue 는 실패 시 null 을 반환하므로 balanceError 를 건드리지 않는다.
-            // suspend 함수이므로 onSuccess 람다가 아닌 launch 본문에서 직접 호출한다.
-            val contract = if (token == "ETH") null else tokenInfo?.address
-            krwText = wallet.getKrwValue(chainId, contract, human)
-        }
-    }
-
-    // 토큰·체인·주소 변경 시 자동 조회
-    LaunchedEffect(token, chainId, address) {
-        if (chainId.isNotEmpty() && address.isNotEmpty()) refreshBalance()
-    }
-
-    SectionContainer(title = "전송", subtitle = "체인 ${chain?.name ?: "없음"} · $token", modifier = modifier) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            tokens.forEachIndexed { i, t ->
-                SegmentedButton(
-                    selected = safeIndex == i,
-                    onClick = { tokenIndex = i },
-                    shape = SegmentedButtonDefaults.itemShape(index = i, count = tokens.size),
-                ) { Text(t) }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-
-        TokenInfoCard(token = token, tokenInfo = tokenInfo)
-        Spacer(Modifier.height(8.dp))
-
-        BalanceRow(
-            balance = balanceText,
-            krw = krwText,
-            loading = balanceLoading,
-            error = balanceError,
-            onRefresh = { refreshBalance() },
-        )
+    SectionContainer(
+        title = "전송",
+        subtitle = "체인 ${chain?.name ?: selectedAsset?.chainId ?: "없음"} · ${selectedAsset?.symbol ?: "자산 없음"}",
+        modifier = modifier,
+    ) {
+        AssetBalanceSection(onSelectedAsset = { selectedAsset = it })
         Spacer(Modifier.height(10.dp))
 
         Row(
@@ -164,11 +76,13 @@ fun TransferSection(modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
 
-        val placeholder = if (token == "ETH") "0.001" else "1"
+        val isNative = selectedAsset?.isNative ?: true
+        val sym = selectedAsset?.symbol ?: "토큰"
+        val placeholder = if (isNative) "0.001" else "1"
         OutlinedTextField(
             value = amount,
             onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-            label = { Text("금액 ($token, 기본 $placeholder)") },
+            label = { Text("금액 ($sym, 기본 $placeholder)") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
@@ -176,17 +90,15 @@ fun TransferSection(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = {
-                // 빈 recipient / chain / token 정보 미충족 시 confirm 자체를 열지 않음.
+                // 빈 recipient / 자산 미선택 시 confirm 자체를 열지 않음.
                 // enabled 조건과 중복되지만 race 보호용 가드.
-                if (recipient.isBlank() || chainId.isEmpty()) return@Button
-                if (token != "ETH" && tokenInfo == null) return@Button
+                if (recipient.isBlank() || selectedAsset == null) return@Button
                 confirm = true
             },
             enabled = state.sdkInitialized
                 && !state.transferLoading
                 && recipient.isNotBlank()
-                && chainId.isNotEmpty()
-                && (token == "ETH" || tokenInfo != null),
+                && selectedAsset != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (state.transferLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -225,17 +137,19 @@ fun TransferSection(modifier: Modifier = Modifier) {
     }
 
     if (confirm) {
-        val effectiveAmount = amount.trim().ifEmpty { if (token == "ETH") "0.001" else "1" }
-        val tokenAddress = tokenInfo?.address
+        val isNative = selectedAsset?.isNative ?: true
+        val effectiveAmount = amount.trim().ifEmpty { if (isNative) "0.001" else "1" }
+        val sym = selectedAsset?.symbol ?: ""
+        val contract = selectedAsset?.contractAddress
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text("거래 확인") },
             text = {
                 Column {
                     ConfirmRow("받는 사람", recipient, mono = true)
-                    ConfirmRow("금액", "$effectiveAmount $token")
-                    tokenAddress?.let { ConfirmRow("토큰", it, mono = true) }
-                    chain?.name?.let { ConfirmRow("체인", it) }
+                    ConfirmRow("금액", "$effectiveAmount $sym")
+                    contract?.let { ConfirmRow("토큰", it, mono = true) }
+                    (chain?.name ?: selectedAsset?.chainId)?.let { ConfirmRow("체인", it) }
                     Spacer(Modifier.height(10.dp))
                     Text(
                         "⚠ 서명 후 되돌릴 수 없습니다.",
@@ -247,7 +161,15 @@ fun TransferSection(modifier: Modifier = Modifier) {
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false
-                    wallet.transfer(recipient, amount, token)
+                    val asset = selectedAsset ?: return@TextButton
+                    wallet.transfer(
+                        recipientInput = recipient,
+                        amountInput = amount,
+                        chainId = asset.chainId,
+                        contractAddress = asset.contractAddress,
+                        decimals = asset.decimals,
+                        symbol = asset.symbol,
+                    )
                 }) { Text("서명 & 전송") }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("취소") } },
@@ -256,79 +178,7 @@ fun TransferSection(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun BalanceRow(
-    balance: String?,
-    krw: String?,
-    loading: Boolean,
-    error: String?,
-    onRefresh: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "현재 잔액",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            when {
-                loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("조회 중…", style = MaterialTheme.typography.bodySmall)
-                }
-                error != null -> Text(
-                    error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                balance != null -> {
-                    Text(balance, style = MaterialTheme.typography.bodyMedium)
-                    krw?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                else -> Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        TextButton(onClick = onRefresh, enabled = !loading) { Text("새로고침") }
-    }
-}
-
-@Composable
-private fun TokenInfoCard(token: String, tokenInfo: TokenInfo?) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-        if (token == "ETH") {
-            Text(
-                "네이티브 코인 (gas 토큰) · decimals 18",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else if (tokenInfo != null) {
-            Text(
-                "${tokenInfo.name} · decimals ${tokenInfo.decimals}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(tokenInfo.address, style = MaterialTheme.typography.labelSmall)
-        } else {
-            Text(
-                "이 체인에 정의된 $token 토큰 정보가 없습니다",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ConfirmRow(label: String, value: String, mono: Boolean = false) {
+internal fun ConfirmRow(label: String, value: String, mono: Boolean = false) {
     Row(modifier = Modifier.padding(vertical = 3.dp)) {
         Text(
             label,
@@ -340,7 +190,7 @@ private fun ConfirmRow(label: String, value: String, mono: Boolean = false) {
     }
 }
 
-private fun parseRecipient(content: String): String {
+internal fun parseRecipient(content: String): String {
     val raw = content.trim()
     if (raw.startsWith("ethereum:", ignoreCase = true)) {
         val rest = raw.substring("ethereum:".length)

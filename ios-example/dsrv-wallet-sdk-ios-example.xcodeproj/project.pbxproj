@@ -303,7 +303,7 @@
 				CODE_SIGN_ENTITLEMENTS = "dsrv-wallet-sdk-ios-example/dsrv-wallet-sdk-ios-example.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LLKHGFK2GS;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -343,7 +343,7 @@
 				CODE_SIGN_ENTITLEMENTS = "dsrv-wallet-sdk-ios-example/dsrv-wallet-sdk-ios-example.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LLKHGFK2GS;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",

@@ -50,7 +50,7 @@ cp .env.sample .env
 | 변수명 | 설명 | 기본값 |
 |--------|------|--------|
 | `PORT` | 서버 실행 포트 | `3000` |
-| `DSRV_API_BASE_URL` | DSRV Gateway 베이스 URL (host only — WaaS/Payments 공용) | `https://api-gw.dev.dsrv.com` |
+| `DSRV_API_BASE_URL` | DSRV Gateway 베이스 URL (host only — WaaS/Payments 공용) | `https://api.dsrv.com` |
 | `X_API_KEY` | DSRV API 키 — Gateway 가 `X-User-Passport` JWT 로 변환 | - |
 | `CUSTOMER_PRIVATE_KEY` | 고객사 EOA 개인키 — `paymentDigest` ECDSA 서명 전용 | - |
 

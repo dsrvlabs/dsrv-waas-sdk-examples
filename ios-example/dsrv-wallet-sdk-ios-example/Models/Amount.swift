@@ -33,26 +33,3 @@ func fromBaseUnits(_ amount: String, decimals: Int) -> String {
     let frac = String(fracRaw.reversed().drop(while: { $0 == "0" }).reversed())
     return frac.isEmpty ? whole : "\(whole).\(frac)"
 }
-
-/// hex 문자열 ("0x..." or "...") → decimal string. 임의 정밀도.
-func hexToDecimalString(_ hex: String) -> String {
-    var clean = hex
-    if clean.hasPrefix("0x") || clean.hasPrefix("0X") { clean = String(clean.dropFirst(2)) }
-    if clean.isEmpty { return "0" }
-
-    var digits: [UInt8] = [0]
-    for ch in clean {
-        guard let nibble = ch.hexDigitValue else { continue }
-        var carry = nibble
-        for i in 0..<digits.count {
-            let v = Int(digits[i]) * 16 + carry
-            digits[i] = UInt8(v % 10)
-            carry = v / 10
-        }
-        while carry > 0 {
-            digits.append(UInt8(carry % 10))
-            carry /= 10
-        }
-    }
-    return String(digits.reversed().map { Character(String($0)) })
-}

@@ -55,6 +55,11 @@ data class WalletUiState(
     val historyItems: List<TransactionHistoryItem> = emptyList(),
     val historyTotal: Int = 0,
     val historyPage: Int = 0,
+    // Asset list (WaaS getAccountAssets, 선택 체인 필터) — 전송 드롭다운/자산조회/결제 공용.
+    // 선택·KRW 같은 화면별 상태는 각 컴포저블이 보관하고, 목록/로딩/에러만 여기서 관리한다.
+    val assets: List<AssetRow> = emptyList(),
+    val assetsLoading: Boolean = false,
+    val assetsError: String? = null,
     // Logs
     val logs: List<String> = emptyList(),
 )

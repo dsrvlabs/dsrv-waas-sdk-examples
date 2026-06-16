@@ -10,10 +10,11 @@ private enum AppScreen: Equatable {
     case feature(Feature)
 
     enum Feature: String, CaseIterable, Equatable {
-        case query, smartAccount, backup, transfer, history, payment, log
+        case query, assetQuery, smartAccount, backup, transfer, history, payment, log
         var title: String {
             switch self {
             case .query: return "지갑 조회"
+            case .assetQuery: return "자산 조회"
             case .smartAccount: return "스마트어카운트"
             case .backup: return "백업 / 복원"
             case .transfer: return "전송"
@@ -25,6 +26,7 @@ private enum AppScreen: Equatable {
         var iconName: String {
             switch self {
             case .query: return "wallet.pass"
+            case .assetQuery: return "list.bullet.rectangle"
             case .smartAccount: return "checkmark.shield"
             case .backup: return "icloud.and.arrow.up"
             case .transfer: return "paperplane"
@@ -36,6 +38,7 @@ private enum AppScreen: Equatable {
         var description: String {
             switch self {
             case .query: return "지갑 주소·체인 정보"
+            case .assetQuery: return "보유 자산 목록 조회"
             case .smartAccount: return "위임(EIP-7702) · 승인"
             case .backup: return "백업 · 복원 · 키 갱신"
             case .transfer: return "ETH · ERC-20 전송"
@@ -434,6 +437,7 @@ private struct FeatureScreen: View {
                 VStack(spacing: 16) {
                     switch feature {
                     case .query: QueryFeature()
+                    case .assetQuery: AssetQueryFeature()
                     case .smartAccount: SmartAccountFeature()
                     case .backup: BackupFeature()
                     case .transfer: TransferFeature()
@@ -503,10 +507,17 @@ private struct QueryFeature: View {
             }
         }
 
-        Text("ⓘ 잔액 조회는 RPC 직접 호출이 필요합니다.")
+        Text("ⓘ 보유 자산·잔액은 '자산 조회' 탭에서 확인합니다 (WaaS 자산 API).")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 보유 자산 전체를 리스트로 조회 (드롭다운 아님) — 자산별 잔액 + KRW.
+private struct AssetQueryFeature: View {
+    var body: some View {
+        AssetListView()
     }
 }
 
