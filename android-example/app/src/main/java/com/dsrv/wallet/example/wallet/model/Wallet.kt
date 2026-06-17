@@ -395,9 +395,9 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         val recipient = recipientInput
 
         val isNative = contractAddress.isNullOrEmpty()
-        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
-        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
-        if (!isNative && decimals <= 0) {
+        // decimals 미확인(price-hub 메타 실패/미지원 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 native·토큰 모두 전송을 차단한다(앱이 raw amount 를 직접 계산).
+        if (decimals <= 0) {
             uiState = uiState.copy(transferError = "자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요.")
             return
         }
@@ -539,8 +539,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
     /**
      * 자산 1건 → [AssetRow]. 심볼 우선순위: ① WaaS([AccountAssetItem.symbol], 정확) ② price-hub
      * ③ 체인 계열 fallback(native→EVM=ETH, 토큰→"TOKEN"). decimals 는 WaaS 가 주지 않으므로 항상
-     * price-hub 에서 받고, 없으면(미지원/실패) native 는 18, 토큰은 decimals 미상(0, raw 표시)으로
-     * 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
+     * price-hub 에서 받고, 없으면(미지원/실패) native·토큰 모두 0(decimals 미상, raw 표시)으로 폴백한다
+     * — 0 이면 전송이 차단된다(transfer). 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
      */
     private suspend fun buildAssetRow(item: AccountAssetItem): AssetRow {
         val isNative = item.contractAddress.isNullOrEmpty()
@@ -550,7 +550,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         val fallbackSymbol = if (isNative) nativeFallbackSymbol(item.chainType) else "TOKEN"
         var symbol = if (hasWaasSymbol) waasSymbol!!.uppercase() else fallbackSymbol
         var name = symbol
-        var decimals = if (isNative) 18 else 0
+        var decimals = 0
         runCatching {
             assetValueRepository.getLatestValue(
                 chainId = item.chainId,
@@ -565,7 +565,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                 meta.asset.symbol.trim().takeIf { it.isNotEmpty() }?.let { symbol = it.uppercase() }
             }
             meta.asset.name.takeIf { it.isNotEmpty() }?.let { name = it }
-            decimals = meta.asset.decimals.takeIf { it > 0 } ?: (if (isNative) 18 else 0)
+            decimals = meta.asset.decimals.takeIf { it > 0 } ?: 0
         }
         val humanized = if (decimals > 0) {
             fromBaseUnits(BigInteger(item.balance.ifEmpty { "0" }), decimals)

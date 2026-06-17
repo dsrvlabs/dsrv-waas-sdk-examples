@@ -175,6 +175,13 @@ class AddressInfo {
   final String? label;
   final String chainType; // "EVM" 등
 
+  /// 이 디바이스에 해당 address 의 local key share 가 존재해 즉시 sign 가능한지.
+  ///
+  /// [getAccountList] 호출 시점의 snapshot — 이후 [restore] 등으로 share 가 채워지면
+  /// 다음 [getAccountList] 호출에서 갱신된다. true 면 sign / transfer 등 바로 호출 가능,
+  /// false 면 다른 디바이스에서 만들어진 address 라 [restore] 가 필요.
+  final bool isAvailable;
+
   const AddressInfo({
     required this.accountId,
     required this.addressId,
@@ -182,6 +189,7 @@ class AddressInfo {
     required this.publicKey,
     this.label,
     required this.chainType,
+    this.isAvailable = false,
   });
 
   factory AddressInfo.fromMap(Map<dynamic, dynamic> map) => AddressInfo(
@@ -191,6 +199,7 @@ class AddressInfo {
         publicKey: map['publicKey'] as String,
         label: map['label'] as String?,
         chainType: map['chainType'] as String,
+        isAvailable: (map['isAvailable'] as bool?) ?? false,
       );
 }
 

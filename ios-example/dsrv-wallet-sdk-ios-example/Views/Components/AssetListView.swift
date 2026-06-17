@@ -18,7 +18,15 @@ struct AssetListView: View {
     }
 
     var body: some View {
-        SectionCard("보유 자산", subtitle: "체인 \(chain?.name ?? (wallet.uiState.selectedChainId ?? "없음"))") {
+        SectionCard(
+            "보유 자산",
+            subtitle: "체인 \(chain?.name ?? (wallet.uiState.selectedChainId ?? "없음"))",
+            trailing: {
+                Button("새로고침") { Task { await wallet.loadAssets() } }
+                    .font(.footnote)
+                    .disabled(wallet.uiState.assetsLoading)
+            }
+        ) {
             if wallet.uiState.assetsLoading {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.6)
@@ -42,15 +50,9 @@ struct AssetListView: View {
                     if idx < assets.count - 1 { Divider() }
                 }
             }
-
-            HStack {
-                Spacer()
-                Button("새로고침") { Task { await wallet.loadAssets() } }
-                    .font(.footnote)
-                    .disabled(wallet.uiState.assetsLoading)
-            }
         }
-        .onAppear { Task { await wallet.loadAssets() } }
+        // 이미 목록이 로드된 채 진입하면 onChange(assets) 가 안 떠 KRW 가 비므로 appear 시에도 환산.
+        .onAppear { Task { await wallet.loadAssets(); await loadKrw() } }
         .onChange(of: wallet.address) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedAccountId) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedChainId) { _ in Task { await wallet.loadAssets() } }

@@ -367,12 +367,12 @@ class WalletState extends ChangeNotifier {
         final to = recipient;
 
         final isNative = contractAddress == null || contractAddress.isEmpty;
-        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
-        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
-        if (!isNative && decimals <= 0) {
+        // decimals 미확인(price-hub 메타 실패/미지원 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 native·토큰 모두 전송을 차단한다(앱이 raw amount 를 직접 계산).
+        if (decimals <= 0) {
           transferError = '자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요.';
           notifyListeners();
-          _log('✗ transfer: token decimals unknown (0)');
+          _log('✗ transfer: decimals unknown (0)');
           return;
         }
         final defaultHuman = isNative ? '0.001' : '1';
@@ -541,7 +541,7 @@ class WalletState extends ChangeNotifier {
 
   /// 자산 1건 → [AssetRow]. symbol 은 WaaS([item.symbol]) 우선, 없으면 price-hub 로 보완하고
   /// decimals 는 항상 price-hub 에서 받는다. price-hub 메타가 없으면(미지원/실패) [buildAssetRow] 가
-  /// native 는 18, 토큰은 decimals 미상(0, raw 표시)으로 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(graceful).
+  /// native·토큰 모두 0(decimals 미상, raw 표시)으로 폴백한다(0 이면 전송 차단). 잔액은 항상 노출하고 KRW 만 비운다(graceful).
   Future<AssetRow> _buildAssetRow(AccountAssetItem item) async {
     try {
       final meta = await _assetValueRepo.getLatestValue(
@@ -556,7 +556,7 @@ class WalletState extends ChangeNotifier {
         decimals: meta.asset.decimals,
       );
     } catch (_) {
-      // price-hub 미지원/실패 — 폴백 값(native 18 / token 0) 사용.
+      // price-hub 미지원/실패 — decimals=0 폴백(native·토큰 동일, raw 표시 + 전송 차단).
       return buildAssetRow(item);
     }
   }

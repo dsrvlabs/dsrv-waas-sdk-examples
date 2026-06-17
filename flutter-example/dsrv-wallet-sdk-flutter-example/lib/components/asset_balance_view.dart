@@ -41,7 +41,10 @@ class _AssetBalanceViewState extends State<AssetBalanceView> {
 
   AssetRow? get _selectedAsset {
     final matched = _assets.where((a) => a.id == _selectedAssetId);
-    return matched.isEmpty ? null : matched.first;
+    if (matched.isNotEmpty) return matched.first;
+    // 저장된 선택이 없거나(첫 로드) 목록에 없으면 첫 자산을 기본 선택 — 드롭다운/잔액/KRW 가
+    // 사용자 조작 없이도 즉시 첫 자산을 가리키게 한다(첫 프레임 blank 회피).
+    return _assets.isEmpty ? null : _assets.first;
   }
 
   /// 공용 목록 식별 키 — 자산 id + 잔액을 합쳐 만든다. 목록뿐 아니라 잔액만 바뀌어도 키가 바뀌어
@@ -110,10 +113,9 @@ class _AssetBalanceViewState extends State<AssetBalanceView> {
     final hint = Theme.of(context).hintColor;
     final errorColor = Theme.of(context).colorScheme.error;
     final asset = _selectedAsset;
-    // DropdownButton.value 는 items 에 존재할 때만 유지 — 목록 변경 직후(post-frame 보정 전) 프레임에서
-    // value 가 items 에 없으면 Flutter 가 assertion 으로 크래시하므로 없으면 null 로.
-    final safeSelectedId =
-        _assets.any((a) => a.id == _selectedAssetId) ? _selectedAssetId : null;
+    // DropdownButton.value 는 items 에 존재해야 함(없으면 assertion 크래시). 기본 선택(첫 자산)을 반영하는
+    // _selectedAsset.id 를 쓰면 첫 프레임부터 collapsed 라벨이 첫 자산을 표시한다(목록 비면 null → 미표시).
+    final safeSelectedId = _selectedAsset?.id;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

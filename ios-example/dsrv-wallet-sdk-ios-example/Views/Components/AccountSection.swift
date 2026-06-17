@@ -86,12 +86,12 @@ struct AccountSection: View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(acc.label).font(.subheadline.bold())
-                Text("id \(shortId(acc.accountId)) · \(acc.addresses.count) wallets")
+                Text("id \(shortId(acc.accountId)) · \(acc.addresses.count) addresses")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("+ 지갑") { addWalletAccountId = acc.accountId }
+            Button("+ 주소") { addWalletAccountId = acc.accountId }
                 .font(.caption)
         }
         .padding(.vertical, 6)

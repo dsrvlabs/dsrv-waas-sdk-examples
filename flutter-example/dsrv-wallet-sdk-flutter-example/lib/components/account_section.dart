@@ -8,7 +8,7 @@ import '../wallet_state.dart';
 /// account 생성/조회 + 지갑 발급. account 별 ListTile + RadioButton + LabelDialog 패턴.
 ///
 /// Note: Flutter `wallet.createAddress()` 는 selectedAccountId 를 사용 — UI 측에서 account
-/// 헤더의 "+ 지갑" 버튼은 해당 accountId 로 selectAccount 후 createAddress 호출.
+/// 헤더의 "+ 주소" 버튼은 해당 accountId 로 selectAccount 후 createAddress 호출.
 class AccountSection extends StatelessWidget {
   final WalletState wallet;
   const AccountSection({super.key, required this.wallet});
@@ -167,13 +167,13 @@ class _AccountHeader extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600)),
                 Text(
-                  'id ${_shortId(account.accountId)} · ${account.addresses.length} wallets',
+                  'id ${_shortId(account.accountId)} · ${account.addresses.length} addresses',
                   style: TextStyle(fontSize: 11, color: hint),
                 ),
               ],
             ),
           ),
-          TextButton(onPressed: onAddWallet, child: const Text('+ 지갑')),
+          TextButton(onPressed: onAddWallet, child: const Text('+ 주소')),
         ],
       ),
     );

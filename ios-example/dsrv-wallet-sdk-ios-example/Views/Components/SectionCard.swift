@@ -1,26 +1,37 @@
 import SwiftUI
 
 /// Android 의 SectionContainer 와 동일한 카드 컨테이너.
-struct SectionCard<Content: View>: View {
+struct SectionCard<Content: View, Trailing: View>: View {
     let title: String
     let subtitle: String?
+    let trailing: Trailing
     let content: Content
 
-    init(_ title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() },
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
         self.subtitle = subtitle
+        self.trailing = trailing()
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                Spacer()
+                trailing
             }
             content
         }

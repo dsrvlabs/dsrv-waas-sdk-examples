@@ -104,7 +104,8 @@ struct PaymentSection: View {
                 ErrorLine(message: err)
             }
         }
-        .onAppear { Task { await wallet.loadAssets() } }
+        // 이미 목록이 로드된 채 진입하면 onChange(assets) 가 안 떠 KRW 가 비므로 appear 시에도 환산.
+        .onAppear { Task { await wallet.loadAssets(); await refreshKrw() } }
         .onChange(of: wallet.address) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedAccountId) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedChainId) { _ in Task { await wallet.loadAssets() } }

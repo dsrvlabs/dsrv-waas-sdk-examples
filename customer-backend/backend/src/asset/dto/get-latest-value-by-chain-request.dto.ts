@@ -17,7 +17,8 @@ export class GetLatestValueByChainRequestDto {
   chainId!: string;
 
   /**
-   * 토큰 컨트랙트 주소. 생략/빈값이면 price-hub 가 해당 체인 native 가스 토큰으로 처리.
+   * 토큰 컨트랙트 주소. 생략/빈값이면 customer-backend 가 'NATIVE' sentinel 로 치환해 해당 체인
+   * native 가스 토큰 가격을 조회한다 (price-hub 는 contractAddress 생략 시 native 를 반환하지 않음).
    * 비-EVM 컨트랙트 주소도 허용해야 하므로 EVM 정규식은 두지 않는다(price-hub 가 검증).
    */
   @IsString()

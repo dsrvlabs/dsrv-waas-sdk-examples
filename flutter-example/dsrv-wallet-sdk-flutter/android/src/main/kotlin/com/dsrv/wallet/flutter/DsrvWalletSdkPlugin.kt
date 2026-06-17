@@ -236,7 +236,8 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 "address" to it.address,
                 "publicKey" to it.publicKey,
                 "label" to it.label,
-                "chainType" to it.chainType
+                "chainType" to it.chainType,
+                "isAvailable" to it.isAvailable
             )
         }
     )

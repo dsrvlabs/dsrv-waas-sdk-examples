@@ -171,7 +171,8 @@ public struct AddressInfo {
   public let publicKey: Swift.String
   public let label: Swift.String?
   public let chainType: Swift.String
-  public init(accountId: Swift.String, addressId: Swift.String, address: Swift.String, publicKey: Swift.String, label: Swift.String? = nil, chainType: Swift.String)
+  public let isAvailable: Swift.Bool
+  public init(accountId: Swift.String, addressId: Swift.String, address: Swift.String, publicKey: Swift.String, label: Swift.String? = nil, chainType: Swift.String, isAvailable: Swift.Bool = false)
 }
 public struct AccountInfo {
   public let accountId: Swift.String
@@ -209,6 +210,8 @@ public enum WalletError : Foundation.LocalizedError, Swift.CustomStringConvertib
   case backupFailed(Swift.String)
   case restoreFailed(Swift.String)
   case passkeyPrfUnavailable(Swift.String)
+  case noKeyShareToBackup
+  case noKeyShareToRestore
   case networkError(Swift.String)
   case mpcError(Swift.String)
   case unknown(Swift.String)

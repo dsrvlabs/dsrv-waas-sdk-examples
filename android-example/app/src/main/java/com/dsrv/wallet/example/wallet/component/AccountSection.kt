@@ -122,9 +122,9 @@ fun AccountSection(modifier: Modifier = Modifier) {
 private fun AccountSectionHeader(account: AccountInfo, onAddWallet: () -> Unit) {
     ListItem(
         headlineContent = { Text(account.label) },
-        supportingContent = { Text("id ${shortId(account.accountId)} · ${account.addresses.size} wallets") },
+        supportingContent = { Text("id ${shortId(account.accountId)} · ${account.addresses.size} addresses") },
         trailingContent = {
-            TextButton(onClick = onAddWallet) { Text("+ 지갑") }
+            TextButton(onClick = onAddWallet) { Text("+ 주소") }
         },
     )
 }

@@ -56,14 +56,19 @@ export class AssetService {
     };
   }
 
-  /** price-hub 최신 가치 조회 — chainId + contractAddress(생략 시 native) 기준. */
+  /** native 코인을 가리키는 price-hub contractAddress sentinel. */
+  private static readonly NATIVE_CONTRACT = 'NATIVE';
+
+  /** price-hub 최신 가치 조회 — chainId + contractAddress(생략 시 'NATIVE') 기준. */
   async getLatestValueByChain(
     request: GetLatestValueByChainRequestDto,
   ): Promise<LatestValueByChainResponseDto> {
     const params: Record<string, string> = { chainId: request.chainId };
-    // 생략된 선택 param 은 싣지 않는다 — price-hub 가 자체 기본값(native, KRW, amount=0)을 적용.
-    if (request.contractAddress)
-      params.contractAddress = request.contractAddress;
+    // native 코인(contractAddress 생략/빈값)은 'NATIVE' sentinel 로 명시한다.
+    // price-hub 는 contractAddress 를 생략하면 native 단가·메타를 반환하지 않으므로,
+    // native 값을 받으려면 contractAddress=NATIVE 를 반드시 실어야 한다.
+    params.contractAddress =
+      request.contractAddress?.trim() || AssetService.NATIVE_CONTRACT;
     if (request.currency) params.currency = request.currency;
     if (request.amount) params.amount = request.amount;
 
@@ -99,7 +104,7 @@ export class AssetService {
       const holdings = payload?.holdings as HoldingsDto | undefined;
 
       this.logger.log(
-        `asset.latest-value:ok chainId=${request.chainId} contract=${request.contractAddress ?? 'NATIVE'} currency=${price.currency} value=${price.value}`,
+        `asset.latest-value:ok chainId=${request.chainId} contract=${params.contractAddress} currency=${price.currency} value=${price.value}`,
       );
       return { asset, price, holdings };
     } catch (error) {

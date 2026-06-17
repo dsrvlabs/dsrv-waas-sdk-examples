@@ -91,6 +91,10 @@ class _AssetListViewState extends State<AssetListView> {
     return SectionCard(
       '보유 자산',
       subtitle: '체인 $chainName',
+      trailing: TextButton(
+        onPressed: wallet.assetsLoading ? null : wallet.loadAssets,
+        child: const Text('새로고침'),
+      ),
       children: [
         if (wallet.assetsLoading)
           Text('자산 조회 중…', style: TextStyle(fontSize: 12, color: hint))
@@ -110,13 +114,6 @@ class _AssetListViewState extends State<AssetListView> {
             if (i < _assets.length - 1)
               Divider(height: 1, color: Theme.of(context).dividerColor),
           ],
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: wallet.assetsLoading ? null : wallet.loadAssets,
-            child: const Text('새로고침'),
-          ),
-        ),
       ],
     );
   }

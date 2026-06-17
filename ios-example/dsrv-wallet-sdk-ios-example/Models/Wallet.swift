@@ -429,9 +429,9 @@ final class Wallet: ObservableObject {
         let recipient = recipientInput
 
         let isNative = contractAddress?.isEmpty ?? true
-        // 토큰 decimals 미확인(price-hub 메타 실패 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
-        // 의도보다 적게 전송될 수 있으므로 전송을 차단한다. native 는 항상 18 이라 안전.
-        if !isNative, decimals <= 0 {
+        // decimals 미확인(price-hub 메타 실패/미지원 → 0)이면 base unit 변환이 왜곡(소수부 절단)되어
+        // 의도보다 적게 전송될 수 있으므로 native·토큰 모두 전송을 차단한다(앱이 raw amount 를 직접 계산).
+        if decimals <= 0 {
             uiState.transferError = "자산 decimals 를 확인하지 못했습니다. 자산을 새로고침한 뒤 다시 시도하세요."
             return
         }
@@ -612,8 +612,9 @@ final class Wallet: ObservableObject {
         }
     }
 
-    /// 자산 1건 → `AssetRow`. price-hub 메타가 없으면(미지원/실패) native 는 18, 토큰은 decimals
-    /// 미상(0, raw 표시)으로 폴백한다. 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
+    /// 자산 1건 → `AssetRow`. decimals 는 WaaS 가 안 주므로 항상 price-hub 에서 받고, 없으면(미지원/실패)
+    /// native·토큰 모두 0(decimals 미상, raw 표시)으로 폴백한다 — 0 이면 전송이 차단된다(`transfer`).
+    /// 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
     func buildAssetRow(item: AccountAssetItem, valueRepo: AssetValueRepository) async -> AssetRow {
         let isNative = item.contractAddress?.isEmpty ?? true
         // 심볼 우선순위: ① WaaS(item.symbol, 정확) ② price-hub ③ 체인 계열 fallback(EVM→ETH).
@@ -622,7 +623,7 @@ final class Wallet: ObservableObject {
         let fallbackSymbol = isNative ? Wallet.nativeFallbackSymbol(chainType: item.chainType) : "TOKEN"
         var symbol = hasWaasSymbol ? waasSymbol!.uppercased() : fallbackSymbol
         var name = symbol
-        var decimals = isNative ? 18 : 0
+        var decimals = 0
         do {
             // decimals 는 WaaS 가 안 주므로 항상 price-hub 에서 받는다. symbol 은 WaaS 가 없을 때만 보완.
             let meta = try await valueRepo.getLatestValue(
@@ -635,7 +636,7 @@ final class Wallet: ObservableObject {
                 if !metaSymbol.isEmpty { symbol = metaSymbol.uppercased() }
             }
             if !meta.asset.name.isEmpty { name = meta.asset.name }
-            decimals = meta.asset.decimals ?? (isNative ? 18 : 0)
+            decimals = meta.asset.decimals ?? 0
         } catch {
             // price-hub 미지원/실패 — symbol 은 위에서 정한 값(WaaS or fallback), decimals 는 fallback 유지.
         }

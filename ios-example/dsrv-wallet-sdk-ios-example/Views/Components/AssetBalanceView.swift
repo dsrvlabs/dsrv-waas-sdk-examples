@@ -20,12 +20,18 @@ struct AssetBalanceView: View {
     }
 
     private var assets: [AssetRow] { wallet.uiState.assets }
-    private var resolved: AssetRow? { assets.first(where: { $0.id == selectedAssetId }) }
+    /// 저장된 선택 id 가 비었거나(첫 로드) 목록에 없으면 첫 자산으로 기본 선택 — Picker collapsed 라벨/
+    /// 잔액/KRW 가 사용자 조작 없이도 즉시 첫 자산을 가리키게 한다(programmatic 선택 미반영 글리치 회피).
+    private var effectiveSelectedId: String? {
+        if let id = selectedAssetId, assets.contains(where: { $0.id == id }) { return id }
+        return assets.first?.id
+    }
+    private var resolved: AssetRow? { assets.first(where: { $0.id == effectiveSelectedId }) }
 
     /// Picker 선택 시 즉시 KRW 갱신 + 부모에 선택 자산 전달.
     private var assetSelection: Binding<String?> {
         Binding(
-            get: { selectedAssetId },
+            get: { effectiveSelectedId },
             set: { newValue in
                 selectedAssetId = newValue
                 selectedAsset = assets.first(where: { $0.id == newValue })
@@ -39,7 +45,8 @@ struct AssetBalanceView: View {
             assetPicker
             balanceRow
         }
-        .onAppear { Task { await wallet.loadAssets() } }
+        // 이미 목록이 로드된 채 진입하면 onChange(assets) 가 안 떠 선택/KRW 가 비므로 appear 시에도 보정.
+        .onAppear { syncSelection(); Task { await wallet.loadAssets() } }
         .onChange(of: wallet.address) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedAccountId) { _ in Task { await wallet.loadAssets() } }
         .onChange(of: wallet.uiState.selectedChainId) { _ in Task { await wallet.loadAssets() } }

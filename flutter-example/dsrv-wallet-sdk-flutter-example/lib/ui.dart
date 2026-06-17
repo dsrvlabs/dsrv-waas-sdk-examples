@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 class SectionCard extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final Widget? trailing;
   final List<Widget> children;
 
-  const SectionCard(this.title, {super.key, this.subtitle, required this.children});
+  const SectionCard(this.title,
+      {super.key, this.subtitle, this.trailing, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +25,24 @@ class SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          if (subtitle != null) ...[
-            const SizedBox(height: 2),
-            Text(subtitle!, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
-          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
           const SizedBox(height: 12),
           ...children.expand((w) => [w, const SizedBox(height: 10)]),
         ],

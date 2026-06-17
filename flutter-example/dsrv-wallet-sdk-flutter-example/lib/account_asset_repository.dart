@@ -145,8 +145,8 @@ class AssetRow {
 /// 자산 1건 + price-hub 메타(symbol/name/decimals)를 합쳐 [AssetRow] 로 만든다.
 ///
 /// 심볼 우선순위: ① WaaS([item.symbol], 정확) ② price-hub([symbol]) ③ 체인 계열 fallback(native→ETH/SOL,
-/// 토큰→"TOKEN"). decimals 는 WaaS 가 안 주므로 항상 price-hub([decimals]) 에서 받고, 없으면 native 18 /
-/// 토큰 0(raw 표시)으로 폴백한다.
+/// 토큰→"TOKEN"). decimals 는 WaaS 가 안 주므로 항상 price-hub([decimals]) 에서 받고, 없으면 native·토큰
+/// 모두 0(raw 표시)으로 폴백한다 — 0 이면 전송이 차단된다(WalletState.transfer).
 AssetRow buildAssetRow(
   AccountAssetItem item, {
   String? symbol,
@@ -155,7 +155,7 @@ AssetRow buildAssetRow(
 }) {
   final isNative =
       item.contractAddress == null || item.contractAddress!.isEmpty;
-  final resolvedDecimals = decimals ?? (isNative ? 18 : 0);
+  final resolvedDecimals = decimals ?? 0;
   // 심볼은 표준 티커 표기(대문자)로 통일 — price-hub 가 "usdc" 처럼 소문자로 줄 수 있음.
   final hasWaasSymbol = item.symbol != null && item.symbol!.trim().isNotEmpty;
   final hasSymbol = symbol != null && symbol.trim().isNotEmpty;

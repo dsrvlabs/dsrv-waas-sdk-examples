@@ -1,11 +1,9 @@
 package com.dsrv.wallet.example.wallet.component
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,6 +75,9 @@ fun AssetListSection(modifier: Modifier = Modifier) {
         title = "보유 자산",
         subtitle = "체인 ${chainName ?: state.selectedChainId ?: "없음"}",
         modifier = modifier,
+        trailing = {
+            TextButton(onClick = { scope.launch { wallet.loadAssets() } }, enabled = !loading) { Text("새로고침") }
+        },
     ) {
         when {
             loading -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -101,11 +102,6 @@ fun AssetListSection(modifier: Modifier = Modifier) {
                 AssetRowItem(row = row, krw = krwById[row.id])
                 if (i < rows.lastIndex) HorizontalDivider()
             }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { scope.launch { wallet.loadAssets() } }, enabled = !loading) { Text("새로고침") }
         }
     }
 }

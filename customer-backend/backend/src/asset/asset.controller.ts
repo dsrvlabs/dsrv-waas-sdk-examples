@@ -13,7 +13,8 @@ import { LatestValueByChainResponseDto } from './dto/latest-value-by-chain-respo
  * userId·addressId 불필요(projectId(passport) + accountId 스코핑).
  *
  * <p>{@code GET /sdk/asset/by-chain/latest-value?chainId=&contractAddress=&currency=&amount=}
- * — price-hub 로 중계해 자산별 symbol/decimals/단가/환산값을 조회. contractAddress 생략 시 native.
+ * — price-hub 로 중계해 자산별 symbol/decimals/단가/환산값을 조회. contractAddress 생략 시
+ *   customer-backend 가 'NATIVE' 로 치환해 native 가스 토큰을 조회한다.
  */
 @Controller('/sdk/asset')
 export class AssetController {
