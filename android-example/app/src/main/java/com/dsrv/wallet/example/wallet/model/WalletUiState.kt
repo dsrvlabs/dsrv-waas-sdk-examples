@@ -1,6 +1,7 @@
 package com.dsrv.wallet.example.wallet.model
 
 import com.dsrv.wallet.sdk.AccountInfo
+import com.dsrv.wallet.sdk.ChainSetupStatus
 import com.dsrv.wallet.sdk.ChainInfo
 import com.dsrv.wallet.sdk.ChainTxResult
 
@@ -45,6 +46,10 @@ data class WalletUiState(
     val approveLoading: Boolean = false,
     val approveError: String? = null,
     val approveResults: List<ChainTxResult> = emptyList(),
+    // Setup status — chain 별 위임/승인 상태 조회 (read-only)
+    val setupStatusLoading: Boolean = false,
+    val setupStatusError: String? = null,
+    val setupStatus: List<ChainSetupStatus> = emptyList(),
     // Payment (customer-backend POST /payments — TOPUP 흐름)
     val paymentLoading: Boolean = false,
     val paymentError: String? = null,

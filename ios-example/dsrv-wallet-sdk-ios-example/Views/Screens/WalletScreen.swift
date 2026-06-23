@@ -525,6 +525,7 @@ private struct SmartAccountFeature: View {
     var body: some View {
         DelegateSection()
         ApproveSection()
+        SetupStatusSection()
     }
 }
 

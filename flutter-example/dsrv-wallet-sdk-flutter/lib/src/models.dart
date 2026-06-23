@@ -76,15 +76,16 @@ class TxBuildResult {
   /// broadcast 시 path 파라미터로 쓰이는 batch tx id (BTX-...).
   final String txId;
 
-  /// MPC sign 의 id 슬롯에 들어갈 값.
-  /// TRANSACTION 이면 transactionId (TX-...), CONTRACT_CALL 이면 addressSmartAccountId (EXE-...).
+  /// MPC sign 의 id 슬롯에 들어갈 값. [type] (Gas Sponsoring) 에 따라 의미가 다르다:
+  ///   - GS_OFF 이면 transactionId (TX-...) — 자기 가스 부담
+  ///   - GS_ON  이면 batchTxId (BTX-...) — gas sponsor 활성 (Smart Account 경유)
   /// `sign` 다단계 호출 시 [txId] 가 아닌 이 값을 넘겨야 한다.
   final String signId;
 
   /// 서명 대상 keccak256 hash (0x-prefixed).
   final String messageHash;
 
-  /// 서명 대상 message 종류 — TRANSACTION | CONTRACT_CALL.
+  /// 서명 대상 message 종류 — `GS_ON` | `GS_OFF` (Gas Sponsoring on/off).
   final String type;
 
   const TxBuildResult({
@@ -166,6 +167,59 @@ class AccountInfo {
       );
 }
 
+/// chain 별 토큰 1건의 approve 상태.
+///
+/// [approved] 는 Permit2 권한이 결제 컨트랙트에 대해 유효한지, [amount] 는 그 허용량(10진 문자열),
+/// [expiration] 은 Permit2 만료 timestamp(초), [erc20Allowance] 는 Permit2 컨트랙트로의 ERC-20
+/// allowance(10진 문자열) 다.
+class TokenApproval {
+  final String token; // 0x-prefixed ERC-20 컨트랙트 주소
+  final bool approved;
+  final String amount; // Permit2 허용량 (10진 문자열)
+  final int expiration; // Permit2 만료 timestamp (초)
+  final String erc20Allowance; // Permit2 로의 ERC-20 allowance (10진 문자열)
+
+  const TokenApproval({
+    required this.token,
+    required this.approved,
+    required this.amount,
+    required this.expiration,
+    required this.erc20Allowance,
+  });
+
+  factory TokenApproval.fromMap(Map<dynamic, dynamic> map) => TokenApproval(
+        token: map['token'] as String,
+        approved: map['approved'] as bool,
+        amount: map['amount'] as String,
+        expiration: (map['expiration'] as num).toInt(),
+        erc20Allowance: map['erc20Allowance'] as String,
+      );
+}
+
+/// chain 별 위임/승인 상태 — [getSetupStatus] 및 [AddressInfo.setupStatus] 의 entry.
+///
+/// [delegated] 는 EIP-7702 위임 여부, [approvals] 는 token 별 상세.
+class ChainSetupStatus {
+  final String chainId;
+  final bool delegated;
+  final List<TokenApproval> approvals;
+
+  const ChainSetupStatus({
+    required this.chainId,
+    required this.delegated,
+    this.approvals = const [],
+  });
+
+  factory ChainSetupStatus.fromMap(Map<dynamic, dynamic> map) =>
+      ChainSetupStatus(
+        chainId: map['chainId'] as String,
+        delegated: map['delegated'] as bool,
+        approvals: ((map['approvals'] as List?) ?? const [])
+            .map((e) => TokenApproval.fromMap(e as Map))
+            .toList(),
+      );
+}
+
 /// 등록된 address 정보.
 class AddressInfo {
   final String accountId;
@@ -182,6 +236,10 @@ class AddressInfo {
   /// false 면 다른 디바이스에서 만들어진 address 라 [restore] 가 필요.
   final bool isAvailable;
 
+  /// chain 별 위임/승인 상태 (additive — native 가 채워주면 non-null, 아니면 null).
+  /// [getSetupStatus] 와 동일한 shape. snapshot 이므로 갱신은 다음 [getAccountList] 호출에서.
+  final List<ChainSetupStatus>? setupStatus;
+
   const AddressInfo({
     required this.accountId,
     required this.addressId,
@@ -190,6 +248,7 @@ class AddressInfo {
     this.label,
     required this.chainType,
     this.isAvailable = false,
+    this.setupStatus,
   });
 
   factory AddressInfo.fromMap(Map<dynamic, dynamic> map) => AddressInfo(
@@ -200,6 +259,9 @@ class AddressInfo {
         label: map['label'] as String?,
         chainType: map['chainType'] as String,
         isAvailable: (map['isAvailable'] as bool?) ?? false,
+        setupStatus: (map['setupStatus'] as List?)
+            ?.map((e) => ChainSetupStatus.fromMap(e as Map))
+            .toList(),
       );
 }
 

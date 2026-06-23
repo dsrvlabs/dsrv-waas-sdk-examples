@@ -10,6 +10,7 @@ import '../components/history_section.dart';
 import '../components/log_section.dart';
 import '../components/payment_section.dart';
 import '../components/restore_section.dart';
+import '../components/setup_status_section.dart';
 import '../components/transfer_section.dart';
 import '../ui.dart';
 import '../wallet_state.dart';
@@ -85,6 +86,7 @@ class FeatureScreen extends StatelessWidget {
         return [
           DelegateSection(wallet: wallet),
           ApproveSection(wallet: wallet),
+          SetupStatusSection(wallet: wallet),
         ];
       case FeatureKind.backup:
         return [

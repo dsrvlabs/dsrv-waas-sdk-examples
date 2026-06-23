@@ -60,11 +60,11 @@ struct BuildTransferRequest {
 struct BuildTransferResponse: Decodable {
     /// broadcast path 파라미터 (BTX-...).
     let txId: String
-    /// MPC sign 의 id 슬롯에 그대로 넘김 — TRANSACTION 이면 TX-..., CONTRACT_CALL 이면 EXE-...
+    /// MPC sign 의 id 슬롯에 그대로 넘김 — GS_OFF 이면 TX-..., GS_ON 이면 BTX-...
     let signId: String
     /// 서명 대상 keccak256 hash (0x-hex).
     let messageHash: String
-    /// 서명 대상 message 종류 — TRANSACTION | CONTRACT_CALL.
+    /// 서명 대상 message 종류 — `GS_ON` | `GS_OFF` (Gas Sponsoring on/off).
     let type: String
 }
 

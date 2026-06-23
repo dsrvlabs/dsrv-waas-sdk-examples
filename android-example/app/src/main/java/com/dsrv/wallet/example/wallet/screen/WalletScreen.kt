@@ -73,6 +73,7 @@ import com.dsrv.wallet.example.wallet.component.LogSection
 import com.dsrv.wallet.example.wallet.component.PaymentSection
 import com.dsrv.wallet.example.wallet.component.QRCodeView
 import com.dsrv.wallet.example.wallet.component.RestoreSection
+import com.dsrv.wallet.example.wallet.component.SetupStatusSection
 import com.dsrv.wallet.example.wallet.component.TransferSection
 import com.dsrv.wallet.example.wallet.model.Wallet
 
@@ -603,6 +604,8 @@ private fun SmartAccountFeature() {
     DelegateSection()
     Spacer(Modifier.height(12.dp))
     ApproveSection()
+    Spacer(Modifier.height(12.dp))
+    SetupStatusSection()
 }
 
 // ── 백업 / 복원 ──────────────────────────────────────────

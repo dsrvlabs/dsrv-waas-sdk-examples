@@ -227,6 +227,26 @@ class DSRVWallet {
     });
   }
 
+  /// 선택 address 의 chain 별 위임/승인 상태 조회. 결과는 chain 별 [ChainSetupStatus] 목록
+  /// (각 chain 의 [ChainSetupStatus.delegated] + token 별 상세).
+  ///
+  /// [accountId] / [addressId] 는 [getAccountList] 의 [AddressInfo] 에서 받는다.
+  /// approve / revoke / delegate / revoke 후 갱신된 상태를 다시 조회할 때 사용.
+  static Future<WalletResult<List<ChainSetupStatus>>> getSetupStatus({
+    required String accountId,
+    required String addressId,
+  }) {
+    return _guard(() async {
+      final list = await NativeBridge.invokeList('getSetupStatus', {
+        'accountId': accountId,
+        'addressId': addressId,
+      });
+      return (list ?? const [])
+          .map((e) => ChainSetupStatus.fromMap(e as Map))
+          .toList();
+    });
+  }
+
   /// 보류 중인 keyShare 를 OS 클라우드(iCloud / Block Store)에 백업.
   static Future<WalletResult<void>> backup() {
     return _guard(() async {

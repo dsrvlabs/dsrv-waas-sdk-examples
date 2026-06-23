@@ -156,6 +156,11 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             "approve" -> DSRVWallet.approve(call.arg("address"), call.arg("amount"))
                 .reply(result) { list -> list.map(::chainTxResultMap) }
 
+            "getSetupStatus" -> DSRVWallet.getSetupStatus(
+                accountId = call.arg("accountId"),
+                addressId = call.arg("addressId")
+            ).reply(result) { list -> list.map(::chainSetupStatusMap) }
+
             "backup" -> {
                 val act = activity ?: return result.error(
                     "4201", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
@@ -237,7 +242,8 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 "publicKey" to it.publicKey,
                 "label" to it.label,
                 "chainType" to it.chainType,
-                "isAvailable" to it.isAvailable
+                "isAvailable" to it.isAvailable,
+                "setupStatus" to it.setupStatus?.map(::chainSetupStatusMap)
             )
         }
     )
@@ -255,6 +261,20 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         "outcome" to r.outcome,
         "txHash" to r.txHash,
         "errorMessage" to r.errorMessage,
+    )
+
+    private fun chainSetupStatusMap(c: com.dsrv.wallet.sdk.ChainSetupStatus) = mapOf(
+        "chainId" to c.chainId,
+        "delegated" to c.delegated,
+        "approvals" to c.approvals.map(::tokenApprovalMap),
+    )
+
+    private fun tokenApprovalMap(t: com.dsrv.wallet.sdk.TokenApproval) = mapOf(
+        "token" to t.token,
+        "approved" to t.approved,
+        "amount" to t.amount,
+        "expiration" to t.expiration,
+        "erc20Allowance" to t.erc20Allowance,
     )
 
     private fun challengeReqMap(r: ChallengeRequest) = mapOf(

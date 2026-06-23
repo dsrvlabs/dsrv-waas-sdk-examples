@@ -64,6 +64,11 @@ struct WalletUiState {
     var approveError: String? = nil
     var approveResults: [ChainTxResult] = []
 
+    // Setup status — chain 별 위임·승인 상태 (읽기 전용)
+    var setupStatusLoading: Bool = false
+    var setupStatusError: String? = nil
+    var setupStatus: [ChainSetupStatus] = []
+
     // Payment (customer-backend POST /payments — TOPUP)
     var paymentLoading: Bool = false
     var paymentError: String? = nil
@@ -613,7 +618,7 @@ final class Wallet: ObservableObject {
     }
 
     /// 자산 1건 → `AssetRow`. decimals 는 WaaS 가 안 주므로 항상 price-hub 에서 받고, 없으면(미지원/실패)
-    /// native·토큰 모두 0(decimals 미상, raw 표시)으로 폴백한다 — 0 이면 전송이 차단된다(`transfer`).
+    /// native 는 체인 계열별 고정값(EVM=18, SVM=9)으로, 토큰은 0(decimals 미상, raw 표시)으로 폴백한다 — 토큰은 0 이면 전송이 차단된다(`transfer`).
     /// 잔액은 항상 노출하고 KRW 만 비운다(기존 graceful 동작 유지).
     func buildAssetRow(item: AccountAssetItem, valueRepo: AssetValueRepository) async -> AssetRow {
         let isNative = item.contractAddress?.isEmpty ?? true
@@ -640,6 +645,11 @@ final class Wallet: ObservableObject {
         } catch {
             // price-hub 미지원/실패 — symbol 은 위에서 정한 값(WaaS or fallback), decimals 는 fallback 유지.
         }
+        // native 코인은 decimals 가 체인 계열별로 고정(EVM=18, SVM=9)이므로 price-hub 가 못 줬을 때 그 값으로 폴백한다.
+        // 이러면 화면 표시가 raw 대신 사람이 읽는 값으로 humanize 되고, 전송 시 base unit 변환도 정상화된다.
+        if isNative && decimals <= 0 {
+            decimals = Wallet.nativeFallbackDecimals(chainType: item.chainType)
+        }
         let humanized = decimals > 0 ? fromBaseUnits(item.balance, decimals: decimals) : item.balance
         return AssetRow(
             chainId: item.chainId,
@@ -658,6 +668,15 @@ final class Wallet: ObservableObject {
         switch chainType.uppercased() {
         case "SVM", "SOLANA": return "SOL"
         default: return "ETH"
+        }
+    }
+
+    /// price-hub 가 native 코인 decimals 를 못 줄 때의 체인 계열별 기본값 — EVM=18(wei), SVM=9(lamport).
+    /// 모든 native 를 18 로 강제하면 Solana 가 10^9 배 왜곡되므로 체인 계열로 분기한다.
+    static func nativeFallbackDecimals(chainType: String) -> Int {
+        switch chainType.uppercased() {
+        case "SVM", "SOLANA": return 9
+        default: return 18
         }
     }
 
@@ -774,6 +793,7 @@ final class Wallet: ObservableObject {
                 let failures = list.count - successes
                 uiState.delegateResults = list
                 uiState.delegateAlreadyDone = list.isEmpty
+                getSetupStatus(addressInput: addr)
                 if list.isEmpty {
                     addLog("ⓘ delegate skip: 이미 위임됨")
                 } else {
@@ -826,6 +846,7 @@ final class Wallet: ObservableObject {
                 uiState.delegateResults = []
                 uiState.delegateAlreadyDone = false
                 uiState.approveResults = []
+                getSetupStatus(addressInput: addr)
                 if list.isEmpty {
                     addLog("ⓘ revoke skip: 위임된 체인 없음")
                 } else {
@@ -880,6 +901,7 @@ final class Wallet: ObservableObject {
                 let successes = list.filter { $0.isSuccess }.count
                 let failures = list.count - successes
                 uiState.approveResults = list
+                getSetupStatus(addressInput: addr)
                 addLog("✓ approve (success=\(successes) / failed=\(failures) of \(list.count))")
                 for item in list {
                     if !item.isSuccess {
@@ -894,6 +916,56 @@ final class Wallet: ObservableObject {
             case .failure(let error):
                 uiState.approveError = error.description
                 addLog("✗ approve FAILED: \(error.description)")
+            }
+        }
+    }
+
+    // MARK: - Setup status (읽기 전용 — chain 별 위임·승인 상태)
+
+    /// 선택된 address 의 (accountId, addressId) 를 accounts 목록에서 역조회.
+    /// getSetupStatus 는 path 식별자로 둘 다 필요하다.
+    private func resolveAccountAddressId(for addr: String) -> (accountId: String, addressId: String)? {
+        let normalized = addr.lowercased()
+        for acc in uiState.accounts {
+            if let a = acc.addresses.first(where: { $0.address.lowercased() == normalized }) {
+                return (acc.accountId, a.addressId)
+            }
+        }
+        return nil
+    }
+
+    /// 선택 address 의 chain 별 위임·승인 상태를 조회한다. approve/revoke/delegate 직후 갱신 호출.
+    func getSetupStatus(addressInput: String = "") {
+        guard uiState.sdkInitialized else {
+            uiState.setupStatusError = "SDK 가 초기화되지 않았습니다"
+            return
+        }
+        let addr = addressInput.isEmpty ? address : addressInput
+        if addr.isEmpty {
+            uiState.setupStatusError = "address 가 필요합니다 (지갑을 먼저 선택)"
+            return
+        }
+        guard let ids = resolveAccountAddressId(for: addr) else {
+            uiState.setupStatusError = "addressId 를 찾지 못했습니다 (getAccountList 먼저 실행)"
+            return
+        }
+        uiState.setupStatusLoading = true
+        uiState.setupStatusError = nil
+        addLog("▶ getSetupStatus(address=\(addr.prefix(10))…)")
+
+        Task {
+            let result = await DSRVWallet.getSetupStatus(accountId: ids.accountId, addressId: ids.addressId)
+            uiState.setupStatusLoading = false
+            switch result {
+            case .success(let list):
+                uiState.setupStatus = list
+                addLog("✓ getSetupStatus count=\(list.count)")
+                for c in list {
+                    addLog("  chainId=\(c.chainId), delegated=\(c.delegated), tokens=\(c.approvals.count)")
+                }
+            case .failure(let error):
+                uiState.setupStatusError = error.description
+                addLog("✗ getSetupStatus FAILED: \(error.description)")
             }
         }
     }

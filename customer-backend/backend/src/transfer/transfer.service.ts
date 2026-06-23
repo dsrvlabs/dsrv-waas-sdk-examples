@@ -87,9 +87,6 @@ export class TransferService {
       const txId = first.batchTxId as string | undefined;
       const messageHash = first.messageHash as string | undefined;
       const transactionId = first.txId as string | undefined;
-      const addressSmartAccountId = first.addressSmartAccountId as
-        | string
-        | undefined;
 
       if (!type || !txId || !messageHash) {
         this.logger.error(
@@ -100,13 +97,13 @@ export class TransferService {
           HttpStatus.BAD_GATEWAY,
         );
       }
-
-      // MPC sign 의 id 슬롯에 들어갈 값:
-      //   TRANSACTION    → transactionId (TX-...)
-      //   CONTRACT_CALL  → addressSmartAccountId (EXE-...)
+      // MPC sign 의 id 슬롯에 들어갈 값. WaaS 의 GS (Gas Sponsoring) 분기:
+      //   GS_ON  → batchTxId (BTX-...) — gas sponsor 활성 (Smart Account 경유)
+      //   GS_OFF → transactionId (TX-...) — 자기 가스 부담
+      // unknown type 은 아래 if(!signId) 가드가 잡아 BAD_GATEWAY 로 surface.
       let signId: string | undefined;
-      if (type === 'CONTRACT_CALL') signId = addressSmartAccountId;
-      else if (type === 'TRANSACTION') signId = transactionId;
+      if (type === 'GS_ON') signId = txId; // txId === first.batchTxId
+      else if (type === 'GS_OFF') signId = transactionId;
       if (!signId) {
         this.logger.error(
           `transfer.build:missing-signId type=${type} body=${JSON.stringify(response.data)}`,

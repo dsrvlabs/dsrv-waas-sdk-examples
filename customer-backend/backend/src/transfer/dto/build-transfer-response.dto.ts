@@ -8,13 +8,13 @@ export interface BuildTransferResponseDto {
   /** broadcast 시 path 파라미터로 쓰이는 batch tx id (BTX-...). */
   txId: string;
   /**
-   * MPC sign 의 id 슬롯에 들어갈 값.
-   * type=TRANSACTION    → transactionId (TX-...)
-   * type=CONTRACT_CALL  → addressSmartAccountId (EXE-...)
+   * MPC sign 의 id 슬롯에 들어갈 값. WaaS 의 Gas Sponsoring 분기에 따라 의미가 다름:
+   *   type=GS_OFF → transactionId (TX-...) — 자기 가스 부담
+   *   type=GS_ON  → batchTxId (BTX-...) — gas sponsor 활성 (Smart Account 경유)
    */
   signId: string;
   /** 서명 대상 keccak256 hash (0x-hex). */
   messageHash: string;
-  /** message 종류 식별자 — TRANSACTION | CONTRACT_CALL. */
+  /** message 종류 식별자 — `GS_ON` | `GS_OFF` (Gas Sponsoring on/off). */
   type: string;
 }

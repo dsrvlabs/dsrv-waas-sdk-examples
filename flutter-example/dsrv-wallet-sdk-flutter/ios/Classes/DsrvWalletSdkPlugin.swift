@@ -151,6 +151,13 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
             )
             reply(r, result) { $0.map(self.chainTxResultMap) }
 
+        case "getSetupStatus":
+            let r = await DSRVWallet.getSetupStatus(
+                accountId: try requiredString(args, "accountId"),
+                addressId: try requiredString(args, "addressId")
+            )
+            reply(r, result) { $0.map(self.chainSetupStatusMap) }
+
         case "backup":
             let r = await DSRVWallet.backup()
             reply(r, result) { _ in nil }
@@ -219,6 +226,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 "label": $0.label,
                 "chainType": $0.chainType,
                 "isAvailable": $0.isAvailable,
+                "setupStatus": $0.setupStatus?.map(self.chainSetupStatusMap),
             ] },
         ]
     }
@@ -237,6 +245,24 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
             "outcome": r.outcome,
             "txHash": r.txHash,
             "errorMessage": r.errorMessage,
+        ]
+    }
+
+    private func chainSetupStatusMap(_ c: ChainSetupStatus) -> [String: Any?] {
+        return [
+            "chainId": c.chainId,
+            "delegated": c.delegated,
+            "approvals": c.approvals.map(self.tokenApprovalMap),
+        ]
+    }
+
+    private func tokenApprovalMap(_ t: TokenApproval) -> [String: Any?] {
+        return [
+            "token": t.token,
+            "approved": t.approved,
+            "amount": t.amount,
+            "expiration": t.expiration,
+            "erc20Allowance": t.erc20Allowance,
         ]
     }
 }

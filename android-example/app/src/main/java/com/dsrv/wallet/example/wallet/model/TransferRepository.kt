@@ -61,11 +61,11 @@ data class BuildTransferRequest(
 data class BuildTransferResponse(
     /** broadcast path 파라미터 (BTX-...). */
     val txId: String,
-    /** MPC sign 의 id 슬롯에 그대로 넘김 — TRANSACTION 이면 TX-..., CONTRACT_CALL 이면 EXE-... */
+    /** MPC sign 의 id 슬롯에 그대로 넘김 — GS_OFF 이면 TX-..., GS_ON 이면 BTX-... */
     val signId: String,
     /** 서명 대상 keccak256 hash (0x-hex). */
     val messageHash: String,
-    /** 서명 대상 message 종류 — TRANSACTION | CONTRACT_CALL. */
+    /** 서명 대상 message 종류 — `GS_ON` | `GS_OFF` (Gas Sponsoring on/off). */
     val type: String,
 )
 

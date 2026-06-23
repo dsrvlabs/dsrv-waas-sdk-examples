@@ -58,6 +58,9 @@ class WalletState extends ChangeNotifier {
       revokeResults = [];
       approveResults = [];
       approveError = null;
+      setupStatus = [];
+      setupStatusError = null;
+      selectedAddressId = null;
       paymentResult = null;
       paymentError = null;
       backupResult = null;
@@ -97,6 +100,9 @@ class WalletState extends ChangeNotifier {
     revokeResults = [];
     approveResults = [];
     approveError = null;
+    setupStatus = [];
+    setupStatusError = null;
+    selectedAddressId = null;
     paymentResult = null;
     paymentError = null;
     backupResult = null;
@@ -132,6 +138,9 @@ class WalletState extends ChangeNotifier {
   List<ChainTxResult> revokeResults = [];
   List<ChainTxResult> approveResults = [];
   String? approveError;
+  // chain 별 위임/승인 상태 snapshot (getSetupStatus / getAccountList).
+  List<ChainSetupStatus> setupStatus = [];
+  String? setupStatusError;
   PaymentResponse? paymentResult;
   String? paymentError;
   String? backupResult;
@@ -246,8 +255,15 @@ class WalletState extends ChangeNotifier {
         .where((w) => w.address.toLowerCase() == normalized);
     address = acc.isEmpty ? normalized : acc.first.address.toLowerCase();
     publicKey = acc.isEmpty ? '' : acc.first.publicKey;
+    selectedAddressId = acc.isEmpty ? null : acc.first.addressId;
+    // 선택된 지갑이 바뀌면 이전 setup status snapshot 은 무효 — getAccountList 가 같이 실어준
+    // snapshot 이 있으면 그것으로 채우고, 없으면 비운다.
+    setupStatus = acc.isEmpty ? [] : (acc.first.setupStatus ?? []);
     notifyListeners();
   }
+
+  /// 선택된 지갑의 addressId — [getSetupStatus] 호출에 필요.
+  String? selectedAddressId;
 
   // ===== Chain =====
 
@@ -654,21 +670,23 @@ class WalletState extends ChangeNotifier {
         if (!initialized || address.isEmpty) return;
         _log('▶ delegate(address=$address)');
         final r = await DSRVWallet.delegate(address: address);
-        r.fold((list) {
+        await r.fold((list) async {
           delegateResults = list;
           _logChainResults('delegate', list);
-        }, (e) => _log('✗ ${e.message}'));
+          await getSetupStatus();
+        }, (e) async => _log('✗ ${e.message}'));
       });
 
   Future<void> revoke() => _op('revoke', () async {
         if (!initialized || address.isEmpty) return;
         _log('▶ revoke(address=$address)');
         final r = await DSRVWallet.revoke(address: address);
-        r.fold((list) {
+        await r.fold((list) async {
           revokeResults = list;
           delegateResults = [];
           _logChainResults('revoke', list);
-        }, (e) => _log('✗ ${e.message}'));
+          await getSetupStatus();
+        }, (e) async => _log('✗ ${e.message}'));
       });
 
   // ===== Approve (multicall — 지원 chain 전체 일괄, delegate 선행 필요) =====
@@ -688,12 +706,38 @@ class WalletState extends ChangeNotifier {
         approveError = null;
         _log('▶ approve(address=${address.substring(0, 10)}…, amount=$resolvedAmount)');
         final r = await DSRVWallet.approve(address: address, amount: resolvedAmount);
-        r.fold((list) {
+        await r.fold((list) async {
           approveResults = list;
           _logChainResults('approve', list);
-        }, (e) {
+          await getSetupStatus();
+        }, (e) async {
           approveError = e.message;
           _log('✗ approve: ${e.message}');
+        });
+      });
+
+  // ===== Setup Status (chain 별 위임/승인 상태 조회) =====
+
+  /// 선택된 지갑(accountId + addressId)의 chain 별 위임/승인 상태를 조회해 [setupStatus] 에 보관.
+  /// delegate / revoke / approve 직후 자동 호출되어 화면 상태를 갱신한다 (수동 새로고침도 가능).
+  Future<void> getSetupStatus() => _op('getSetupStatus', () async {
+        final addressId = selectedAddressId;
+        final accountId = selectedAccountId;
+        if (!initialized || addressId == null || accountId == null) {
+          setupStatusError = 'addressId 가 필요합니다 (지갑을 먼저 선택하세요)';
+          return;
+        }
+        setupStatusError = null;
+        _log('▶ getSetupStatus(accountId=${accountId.substring(0, accountId.length > 8 ? 8 : accountId.length)}…, addressId=$addressId)');
+        final r = await DSRVWallet.getSetupStatus(
+            accountId: accountId, addressId: addressId);
+        r.fold((list) {
+          setupStatus = list;
+          final delegated = list.where((c) => c.delegated).length;
+          _log('✓ setupStatus chains=${list.length} (delegated=$delegated)');
+        }, (e) {
+          setupStatusError = e.message;
+          _log('✗ getSetupStatus: ${e.message}');
         });
       });
 

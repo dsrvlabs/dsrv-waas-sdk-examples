@@ -771,6 +771,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                             else addLog("  ✓ ${it.chainId} [${it.outcome}]")  // ALREADY_DELEGATED / SKIPPED
                         }
                     }
+                    // delegate 직후 위임/승인 상태 자동 갱신
+                    getSetupStatus()
                 } else {
                     val msg = result.errorOrNull()?.message ?: "위임 실패"
                     if (msg.contains("ALREADY_REGISTERED")) {
@@ -822,6 +824,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                             else addLog("  ✓ ${it.chainId} [${it.outcome}]")  // ALREADY_DELEGATED / SKIPPED
                         }
                     }
+                    // revoke 직후 위임/승인 상태 자동 갱신
+                    getSetupStatus()
                 } else {
                     val msg = result.errorOrNull()?.message ?: "해제 실패"
                     uiState = uiState.copy(delegateError = msg)
@@ -870,10 +874,57 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                         else if (it.txHash != null) addLog("  ✓ ${it.chainId} [${it.outcome}]: ${it.txHash}")
                         else addLog("  ✓ ${it.chainId} [${it.outcome}]")
                     }
+                    // approve 직후 위임/승인 상태 자동 갱신
+                    getSetupStatus()
                 } else {
                     val msg = result.errorOrNull()?.message ?: "Approve 실패"
                     uiState = uiState.copy(approveError = msg)
                     addLog("✗ approve FAILED: $msg")
+                }
+            }
+        }
+    }
+
+    // ===== Setup status (위임/승인 상태 조회) =====
+
+    /**
+     * 선택된 지갑의 addressId 를 계정 목록에서 해결한다. [getAccountList] 가 선행되어 있어야 한다.
+     */
+    private fun resolveAddressId(addr: String): String? =
+        uiState.accounts
+            .flatMap { it.addresses }
+            .firstOrNull { it.address.equals(addr, ignoreCase = true) }
+            ?.addressId
+
+    /**
+     * 선택된 account/address 의 chain 별 위임/승인 상태를 조회한다 (read-only).
+     * approve/revoke/delegate/undelegate 직후 상태가 최신으로 반영되도록 자동 호출한다.
+     */
+    fun getSetupStatus() {
+        if (!uiState.sdkInitialized) return
+        val accountId = uiState.selectedAccountId?.takeIf { it.isNotBlank() } ?: return
+        val addr = address.takeIf { it.isNotEmpty() } ?: return
+        val addressId = resolveAddressId(addr) ?: run {
+            uiState = uiState.copy(setupStatusError = "addressId 해결 실패 (계정을 먼저 조회하세요)")
+            return
+        }
+
+        uiState = uiState.copy(setupStatusLoading = true, setupStatusError = null)
+        addLog("▶ getSetupStatus(accountId=${accountId.take(8)}…, addressId=${addressId.take(8)}…)")
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = DSRVWallet.getSetupStatus(accountId = accountId, addressId = addressId)
+            withContext(Dispatchers.Main) {
+                uiState = uiState.copy(setupStatusLoading = false)
+                if (result.isSuccess) {
+                    val list = result.getOrNull() ?: emptyList()
+                    uiState = uiState.copy(setupStatus = list)
+                    addLog("✓ getSetupStatus chains=${list.size}")
+                    list.forEach { addLog("  chainId=${it.chainId}, delegated=${it.delegated}, tokens=${it.approvals.size}") }
+                } else {
+                    val msg = result.errorOrNull()?.message ?: "위임/승인 상태 조회 실패"
+                    uiState = uiState.copy(setupStatusError = msg)
+                    addLog("✗ getSetupStatus FAILED: $msg")
                 }
             }
         }
