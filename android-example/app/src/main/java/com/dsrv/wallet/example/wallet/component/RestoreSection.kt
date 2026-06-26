@@ -24,11 +24,11 @@ fun RestoreSection(modifier: Modifier = Modifier) {
 
     SectionContainer(
         title = "복원",
-        subtitle = "BlockStore + Passkey 로 키 share 복원",
+        subtitle = "Google Drive + Passkey 로 키 share 복원",
         modifier = modifier,
     ) {
         Text(
-            "BlockStore 에 보관된 share 를 일괄 복원. Passkey 인증이 필요할 수 있습니다.",
+            "Google Drive 에 보관된 share 를 일괄 복원. Passkey 인증이 필요할 수 있습니다.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

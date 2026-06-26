@@ -33,11 +33,17 @@ class WalletState extends ChangeNotifier {
 
   /// userId 를 변경한다 (사용자 전환). 이미 SDK 초기화 상태라면 [DSRVWallet.reset] 으로
   /// `initialized` 플래그를 풀어 다음 [initialize] 가 새 [UserCredential] 로 진행되게 한다.
+  ///
+  /// 진행 중인 init 이 있으면 `_initGeneration` 을 증가시켜 그 결과가 새 userId 의 state 를
+  /// stale 결과로 덮어쓰는 race 를 차단한다 (Android `initJob.cancel()` 과 동일 의도 — Dart 의
+  /// Future 는 cancel 이 안 되어 generation token 방식으로 처리).
   Future<void> changeUserId(String newUserId) async {
     final trimmed = newUserId.trim();
     if (trimmed.isEmpty || trimmed == userId) return;
 
-    if (initialized) {
+    if (initialized || initializing) {
+      _initGeneration++;
+      _setupStatusGeneration++;
       await DSRVWallet.reset();
       publicKey = '';
       address = '';
@@ -49,6 +55,8 @@ class WalletState extends ChangeNotifier {
       chains = [];
       selectedChainId = null;
       lastTxHash = null;
+      lastTxStatus = null;
+      lastBatchTxId = null;
       transferError = null;
       historyItems = [];
       historyTotal = 0;
@@ -60,6 +68,7 @@ class WalletState extends ChangeNotifier {
       approveError = null;
       setupStatus = [];
       setupStatusError = null;
+      addressSetupStatusMap = {};
       selectedAddressId = null;
       paymentResult = null;
       paymentError = null;
@@ -78,6 +87,8 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> resetWallet() async {
+    _initGeneration++;
+    _setupStatusGeneration++;
     if (initialized) {
       await DSRVWallet.reset();
     }
@@ -102,6 +113,7 @@ class WalletState extends ChangeNotifier {
     approveError = null;
     setupStatus = [];
     setupStatusError = null;
+    addressSetupStatusMap = {};
     selectedAddressId = null;
     paymentResult = null;
     paymentError = null;
@@ -128,6 +140,8 @@ class WalletState extends ChangeNotifier {
   String publicKey = '';
 
   String? lastTxHash;
+  String? lastTxStatus;
+  String? lastBatchTxId;
   String? transferError;
   List<TransactionHistoryItem> historyItems = [];
   int historyTotal = 0;
@@ -140,6 +154,9 @@ class WalletState extends ChangeNotifier {
   String? approveError;
   // chain 별 위임/승인 상태 snapshot (getSetupStatus / getAccountList).
   List<ChainSetupStatus> setupStatus = [];
+  /// wallet list 화면의 위임/승인 chip 표시용 — addressId → ChainSetupStatus 목록.
+  /// getAccountList 직후 batch fetch 로 채워짐 (N 회 getSetupStatus 호출).
+  Map<String, List<ChainSetupStatus>> addressSetupStatusMap = {};
   String? setupStatusError;
   PaymentResponse? paymentResult;
   String? paymentError;
@@ -182,11 +199,16 @@ class WalletState extends ChangeNotifier {
 
   // ===== SDK init =====
 
+  /// 진행 중인 init 의 generation token — 사용자 전환 / reset 시 증가시켜 stale 결과가 새 state 를
+  /// 덮어쓰는 것 방지. Dart Future 는 cancel 안 되므로 결과 반영 단계에서 비교하는 방식으로 차단.
+  int _initGeneration = 0;
+
   Future<void> initialize() => _op('initialize', () async {
         if (userId.isEmpty) {
           initError = 'userId 를 먼저 입력하세요';
           return;
         }
+        final gen = ++_initGeneration;
         initializing = true;
         initError = null;
         _log('▶ initialize');
@@ -200,6 +222,8 @@ class WalletState extends ChangeNotifier {
           baseUrl: AppConfig.dsrvApiBaseUrl,
           rpId: AppConfig.backupRpId,
         );
+        // 사용자 전환 등으로 새 init 이 이미 진행 중이면 이 결과는 stale — state 갱신 skip.
+        if (gen != _initGeneration) return;
         initializing = false;
         r.fold((_) {
           initialized = true;
@@ -240,8 +264,36 @@ class WalletState extends ChangeNotifier {
             selectedAccountId = list.isEmpty ? null : list.last.accountId;
           }
           _log('✓ accounts=${list.length} (selected=${selectedAccountId ?? "none"})');
+          // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
+          _fetchAllSetupStatuses(list);
         }, (e) => _log('✗ ${e.message}'));
       });
+
+  /// 진행 중인 setupStatus batch fetch 의 generation token — Dart Future 는 cancel 안 되므로
+  /// 결과 적용 단계에서 비교해 stale batch 가 새 호출의 map 을 덮어쓰는 것 방지.
+  int _setupStatusGeneration = 0;
+
+  /// 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [addressSetupStatusMap] 채움.
+  /// `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출.
+  Future<void> _fetchAllSetupStatuses(List<AccountInfo> accs) async {
+    final gen = ++_setupStatusGeneration;
+    final targets = [
+      for (final a in accs)
+        for (final addr in a.addresses) (a.accountId, addr.addressId),
+    ];
+    final results = await Future.wait(targets.map((t) async {
+      final r = await DSRVWallet.getSetupStatus(
+          accountId: t.$1, addressId: t.$2);
+      return r.fold((list) => MapEntry(t.$2, list), (_) => null);
+    }));
+    // 새 batch 가 이미 진행 중이면 stale 결과 반영 skip.
+    if (gen != _setupStatusGeneration) return;
+    addressSetupStatusMap = {
+      for (final e in results.whereType<MapEntry<String, List<ChainSetupStatus>>>()) e.key: e.value,
+    };
+    _log('⚙ setupStatus batch fetched (${addressSetupStatusMap.length}/${targets.length})');
+    notifyListeners();
+  }
 
   void selectAccount(String accountId) {
     selectedAccountId = accountId;
@@ -256,9 +308,11 @@ class WalletState extends ChangeNotifier {
     address = acc.isEmpty ? normalized : acc.first.address.toLowerCase();
     publicKey = acc.isEmpty ? '' : acc.first.publicKey;
     selectedAddressId = acc.isEmpty ? null : acc.first.addressId;
-    // 선택된 지갑이 바뀌면 이전 setup status snapshot 은 무효 — getAccountList 가 같이 실어준
-    // snapshot 이 있으면 그것으로 채우고, 없으면 비운다.
-    setupStatus = acc.isEmpty ? [] : (acc.first.setupStatus ?? []);
+    // 선택된 지갑이 바뀌면 이전 setup status snapshot 은 무효 — batch fetch 한 map 에 있으면
+    // 그것으로 채우고, 없으면 비운다. (단건 fresh fetch 는 SetupStatusSection 진입 시 자동 트리거.)
+    setupStatus = acc.isEmpty
+        ? []
+        : (addressSetupStatusMap[acc.first.addressId] ?? []);
     notifyListeners();
   }
 
@@ -355,6 +409,8 @@ class WalletState extends ChangeNotifier {
       _op('transfer', () async {
         transferError = null;
         lastTxHash = null;
+        lastTxStatus = null;
+        lastBatchTxId = null;
         if (!initialized) {
           transferError = 'SDK 가 초기화되지 않았습니다';
           notifyListeners();
@@ -436,6 +492,8 @@ class WalletState extends ChangeNotifier {
           final broadcast = await _transferRepo
               .broadcast(BroadcastTransferRequest(txId: build.txId));
           lastTxHash = broadcast.txHash;
+          lastTxStatus = broadcast.status.isEmpty ? null : broadcast.status;
+          lastBatchTxId = broadcast.batchTxId.isEmpty ? null : broadcast.batchTxId;
           if (broadcast.txHash != null) {
             _log('✓ transfer txHash=${broadcast.txHash} (status=${broadcast.status})');
           } else {

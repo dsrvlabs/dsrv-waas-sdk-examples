@@ -37,16 +37,24 @@ struct BackupSection: View {
             Button {
                 wallet.dumpKeychain()
             } label: {
-                buttonLabel("Keychain dump", loading: false, style: .outlined)
+                buttonLabel(
+                    "Keychain dump",
+                    loading: wallet.uiState.keychainDumpLoading,
+                    style: .outlined
+                )
             }
-            .disabled(!wallet.uiState.sdkInitialized)
+            .disabled(!wallet.uiState.sdkInitialized || wallet.uiState.keychainDumpLoading)
 
             Button {
                 wallet.clearBackup()
             } label: {
-                buttonLabel("Backup 전체 삭제", loading: false, style: .destructive)
+                buttonLabel(
+                    "Backup 전체 삭제",
+                    loading: wallet.uiState.keychainClearLoading,
+                    style: .destructive
+                )
             }
-            .disabled(!wallet.uiState.sdkInitialized)
+            .disabled(!wallet.uiState.sdkInitialized || wallet.uiState.keychainClearLoading)
 
             if let dump = wallet.uiState.keychainDump {
                 ScrollView {

@@ -161,15 +161,18 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 addressId = call.arg("addressId")
             ).reply(result) { list -> list.map(::chainSetupStatusMap) }
 
+            // FragmentActivity 누락 4개 분기는 모두 `1001` (NotInitialized) 로 통일 — caller 가
+            // WalletError 의 의미가 무관한 코드 (4203 PasskeyPrfUnavailable / 4204 NoKeyShareToBackup
+            // 등) 로 잘못된 분기를 타지 않도록. "SDK 가 사용 가능한 상태가 아님" 의 한 종류로 묶음.
             "backup" -> {
                 val act = activity ?: return result.error(
-                    "4201", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
+                    "1001", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
                 DSRVWallet.backup(act).reply(result) { null }
             }
 
             "restore" -> {
                 val act = activity ?: return result.error(
-                    "4202", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
+                    "1001", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
                 DSRVWallet.restore(act)
                     .reply(result) { list -> list.map { restoredMap(it) } }
             }
@@ -177,8 +180,16 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             // Android 는 Play Integrity(stateless)라 저장된 attest 키가 없음 → no-op
             "clearDeviceKeyForDebug" -> result.success(null)
 
-            "dumpBackupForDebug" -> result.success(DSRVWallet.dumpBlockStoreForDebug())
-            "clearBackupForDebug" -> { DSRVWallet.clearBackupForDebug(); result.success(null) }
+            "dumpBackupForDebug" -> {
+                val act = activity ?: return result.error(
+                    "1001", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
+                result.success(DSRVWallet.dumpBackupForDebug(act))
+            }
+            "clearBackupForDebug" -> {
+                val act = activity ?: return result.error(
+                    "1001", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
+                DSRVWallet.clearBackupForDebug(act); result.success(null)
+            }
 
             else -> result.notImplemented()
         }
@@ -242,8 +253,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 "publicKey" to it.publicKey,
                 "label" to it.label,
                 "chainType" to it.chainType,
-                "isAvailable" to it.isAvailable,
-                "setupStatus" to it.setupStatus?.map(::chainSetupStatusMap)
+                "hasLocalKeyShare" to it.hasLocalKeyShare,
             )
         }
     )

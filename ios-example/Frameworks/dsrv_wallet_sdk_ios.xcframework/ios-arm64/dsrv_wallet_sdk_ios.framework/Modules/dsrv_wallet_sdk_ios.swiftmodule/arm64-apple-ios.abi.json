@@ -4750,6 +4750,20 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SendableMetatype",
+            "printedName": "SendableMetatype",
+            "usr": "s:s16SendableMetatypeP",
+            "mangledName": "$ss16SendableMetatypeP"
           }
         ]
       },
@@ -4977,6 +4991,20 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SendableMetatype",
+            "printedName": "SendableMetatype",
+            "usr": "s:s16SendableMetatypeP",
+            "mangledName": "$ss16SendableMetatypeP"
           }
         ]
       },
@@ -5267,8 +5295,8 @@
           },
           {
             "kind": "Var",
-            "name": "isAvailable",
-            "printedName": "isAvailable",
+            "name": "hasLocalKeyShare",
+            "printedName": "hasLocalKeyShare",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -5278,8 +5306,8 @@
               }
             ],
             "declKind": "Var",
-            "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV11isAvailableSbvp",
-            "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV11isAvailableSbvp",
+            "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV16hasLocalKeyShareSbvp",
+            "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV16hasLocalKeyShareSbvp",
             "moduleName": "dsrv_wallet_sdk_ios",
             "declAttributes": [
               "HasStorage",
@@ -5302,85 +5330,8 @@
                   }
                 ],
                 "declKind": "Accessor",
-                "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV11isAvailableSbvg",
-                "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV11isAvailableSbvg",
-                "moduleName": "dsrv_wallet_sdk_ios",
-                "implicit": true,
-                "accessorKind": "get"
-              }
-            ]
-          },
-          {
-            "kind": "Var",
-            "name": "setupStatus",
-            "printedName": "setupStatus",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Optional",
-                "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]?",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Array",
-                    "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]",
-                    "children": [
-                      {
-                        "kind": "TypeNominal",
-                        "name": "ChainSetupStatus",
-                        "printedName": "dsrv_wallet_sdk_ios.ChainSetupStatus",
-                        "usr": "s:19dsrv_wallet_sdk_ios16ChainSetupStatusV"
-                      }
-                    ],
-                    "usr": "s:Sa"
-                  }
-                ],
-                "usr": "s:Sq"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV11setupStatusSayAA010ChainSetupH0VGSgvp",
-            "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV11setupStatusSayAA010ChainSetupH0VGSgvp",
-            "moduleName": "dsrv_wallet_sdk_ios",
-            "declAttributes": [
-              "HasStorage",
-              "AccessControl",
-              "RawDocComment"
-            ],
-            "isLet": true,
-            "hasStorage": true,
-            "accessors": [
-              {
-                "kind": "Accessor",
-                "name": "Get",
-                "printedName": "Get()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Optional",
-                    "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]?",
-                    "children": [
-                      {
-                        "kind": "TypeNominal",
-                        "name": "Array",
-                        "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]",
-                        "children": [
-                          {
-                            "kind": "TypeNominal",
-                            "name": "ChainSetupStatus",
-                            "printedName": "dsrv_wallet_sdk_ios.ChainSetupStatus",
-                            "usr": "s:19dsrv_wallet_sdk_ios16ChainSetupStatusV"
-                          }
-                        ],
-                        "usr": "s:Sa"
-                      }
-                    ],
-                    "usr": "s:Sq"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV11setupStatusSayAA010ChainSetupH0VGSgvg",
-                "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV11setupStatusSayAA010ChainSetupH0VGSgvg",
+                "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV16hasLocalKeyShareSbvg",
+                "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV16hasLocalKeyShareSbvg",
                 "moduleName": "dsrv_wallet_sdk_ios",
                 "implicit": true,
                 "accessorKind": "get"
@@ -5390,7 +5341,7 @@
           {
             "kind": "Constructor",
             "name": "init",
-            "printedName": "init(accountId:addressId:address:publicKey:label:chainType:isAvailable:setupStatus:)",
+            "printedName": "init(accountId:addressId:address:publicKey:label:chainType:hasLocalKeyShare:)",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -5449,34 +5400,11 @@
                 "printedName": "Swift.Bool",
                 "hasDefaultArg": true,
                 "usr": "s:Sb"
-              },
-              {
-                "kind": "TypeNominal",
-                "name": "Optional",
-                "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]?",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Array",
-                    "printedName": "[dsrv_wallet_sdk_ios.ChainSetupStatus]",
-                    "children": [
-                      {
-                        "kind": "TypeNominal",
-                        "name": "ChainSetupStatus",
-                        "printedName": "dsrv_wallet_sdk_ios.ChainSetupStatus",
-                        "usr": "s:19dsrv_wallet_sdk_ios16ChainSetupStatusV"
-                      }
-                    ],
-                    "usr": "s:Sa"
-                  }
-                ],
-                "hasDefaultArg": true,
-                "usr": "s:Sq"
               }
             ],
             "declKind": "Constructor",
-            "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV9accountId07addressH00I09publicKey5label9chainType11isAvailable11setupStatusACSS_S4SSgSSSbSayAA010ChainSetupR0VGSgtcfc",
-            "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV9accountId07addressH00I09publicKey5label9chainType11isAvailable11setupStatusACSS_S4SSgSSSbSayAA010ChainSetupR0VGSgtcfc",
+            "usr": "s:19dsrv_wallet_sdk_ios11AddressInfoV9accountId07addressH00I09publicKey5label9chainType08hasLocalK5ShareACSS_S4SSgSSSbtcfc",
+            "mangledName": "$s19dsrv_wallet_sdk_ios11AddressInfoV9accountId07addressH00I09publicKey5label9chainType08hasLocalK5ShareACSS_S4SSgSSSbtcfc",
             "moduleName": "dsrv_wallet_sdk_ios",
             "declAttributes": [
               "AccessControl"
@@ -7022,13 +6950,26 @@
               {
                 "kind": "TypeFunc",
                 "name": "Function",
-                "printedName": "(dsrv_wallet_sdk_ios.WalletError.Type) -> dsrv_wallet_sdk_ios.WalletError",
+                "printedName": "(dsrv_wallet_sdk_ios.WalletError.Type) -> (Swift.String) -> dsrv_wallet_sdk_ios.WalletError",
                 "children": [
                   {
-                    "kind": "TypeNominal",
-                    "name": "WalletError",
-                    "printedName": "dsrv_wallet_sdk_ios.WalletError",
-                    "usr": "s:19dsrv_wallet_sdk_ios11WalletErrorO"
+                    "kind": "TypeFunc",
+                    "name": "Function",
+                    "printedName": "(Swift.String) -> dsrv_wallet_sdk_ios.WalletError",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "WalletError",
+                        "printedName": "dsrv_wallet_sdk_ios.WalletError",
+                        "usr": "s:19dsrv_wallet_sdk_ios11WalletErrorO"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ]
                   },
                   {
                     "kind": "TypeNominal",
@@ -7047,8 +6988,8 @@
               }
             ],
             "declKind": "EnumElement",
-            "usr": "s:19dsrv_wallet_sdk_ios11WalletErrorO19noKeyShareToRestoreyA2CmF",
-            "mangledName": "$s19dsrv_wallet_sdk_ios11WalletErrorO19noKeyShareToRestoreyA2CmF",
+            "usr": "s:19dsrv_wallet_sdk_ios11WalletErrorO19noKeyShareToRestoreyACSScACmF",
+            "mangledName": "$s19dsrv_wallet_sdk_ios11WalletErrorO19noKeyShareToRestoreyACSScACmF",
             "moduleName": "dsrv_wallet_sdk_ios"
           },
           {
@@ -8019,7 +7960,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/account\/AccountOperations.swift",
       "kind": "BooleanLiteral",
-      "offset": 1064,
+      "offset": 1079,
       "length": 5,
       "value": "false"
     },
@@ -8516,7 +8457,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/DSRVWallet.swift",
       "kind": "Array",
-      "offset": 42825,
+      "offset": 42890,
       "length": 2,
       "value": "[]"
     },
@@ -8579,14 +8520,14 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Models.swift",
       "kind": "Array",
-      "offset": 4926,
+      "offset": 4946,
       "length": 2,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Models.swift",
       "kind": "BooleanLiteral",
-      "offset": 6055,
+      "offset": 5915,
       "length": 5,
       "value": "false"
     }

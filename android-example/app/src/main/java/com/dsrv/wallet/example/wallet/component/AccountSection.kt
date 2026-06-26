@@ -79,6 +79,7 @@ fun AccountSection(modifier: Modifier = Modifier) {
                     acc.addresses.forEach { addr ->
                         WalletItemRow(
                             address = addr,
+                            setupStatus = state.addressSetupStatusMap[addr.addressId],
                             selected = addr.address.equals(wallet.address, ignoreCase = true),
                             onClick = {
                                 wallet.selectAccount(acc.accountId)
@@ -134,18 +135,23 @@ private fun AccountSectionHeader(account: AccountInfo, onAddWallet: () -> Unit) 
 }
 
 @Composable
-private fun WalletItemRow(address: AddressInfo, selected: Boolean, onClick: () -> Unit) {
+private fun WalletItemRow(
+    address: AddressInfo,
+    setupStatus: List<ChainSetupStatus>?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val display = "${address.address.take(10)}…${address.address.takeLast(6)}"
     val hasLabel = address.label?.isNotBlank() == true
-    val setupStatus = address.setupStatus?.takeIf { it.isNotEmpty() }
+    val nonEmptyStatus = setupStatus?.takeIf { it.isNotEmpty() }
 
     ListItem(
         headlineContent = { Text(display) },
-        supportingContent = if (hasLabel || setupStatus != null) {
+        supportingContent = if (hasLabel || nonEmptyStatus != null) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (hasLabel) Text(address.label!!)
-                    if (setupStatus != null) SetupStatusChips(setupStatus)
+                    if (nonEmptyStatus != null) SetupStatusChips(nonEmptyStatus)
                 }
             }
         } else null,
@@ -156,7 +162,7 @@ private fun WalletItemRow(address: AddressInfo, selected: Boolean, onClick: () -
     )
 }
 
-/** getAccountList 가 반환한 주소별 setupStatus snapshot 을 위임·승인 요약 칩으로 표시. */
+/** Wallet ViewModel 의 [WalletUiState.addressSetupStatusMap] (batch fetched) 으로부터 받은 위임·승인 요약 칩 표시. */
 @Composable
 private fun SetupStatusChips(setupStatus: List<ChainSetupStatus>) {
     val total = setupStatus.size

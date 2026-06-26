@@ -87,6 +87,7 @@ class AccountSection extends StatelessWidget {
               for (final addr in wallet.accounts[i].addresses)
                 _WalletRow(
                   address: addr,
+                  setupStatus: wallet.addressSetupStatusMap[addr.addressId],
                   selected: addr.address.toLowerCase() ==
                       wallet.address.toLowerCase(),
                   onTap: () {
@@ -182,10 +183,12 @@ class _AccountHeader extends StatelessWidget {
 
 class _WalletRow extends StatelessWidget {
   final AddressInfo address;
+  final List<ChainSetupStatus>? setupStatus;
   final bool selected;
   final VoidCallback onTap;
   const _WalletRow({
     required this.address,
+    required this.setupStatus,
     required this.selected,
     required this.onTap,
   });
@@ -219,11 +222,10 @@ class _WalletRow extends StatelessWidget {
                   if (label != null && label.isNotEmpty)
                     Text(label,
                         style: TextStyle(fontSize: 11, color: hint)),
-                  if (address.setupStatus != null &&
-                      address.setupStatus!.isNotEmpty)
+                  if (setupStatus != null && setupStatus!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: _SetupStatusChips(setupStatus: address.setupStatus!),
+                      child: _SetupStatusChips(setupStatus: setupStatus!),
                     ),
                 ],
               ),

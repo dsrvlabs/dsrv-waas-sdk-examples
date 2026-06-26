@@ -12,7 +12,7 @@ class RestoreSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return SectionCard(
       '복원',
-      subtitle: 'BlockStore / iCloud Keychain 에서 키 share 복원',
+      subtitle: 'Google Drive / iCloud Keychain 에서 키 share 복원',
       children: [
         Text(
           '클라우드에 보관된 share 를 일괄 복원합니다. Passkey / 생체인증이 필요할 수 있습니다.',

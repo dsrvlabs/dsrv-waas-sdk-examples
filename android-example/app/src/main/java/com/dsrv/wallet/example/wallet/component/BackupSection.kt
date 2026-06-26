@@ -33,11 +33,11 @@ fun BackupSection(modifier: Modifier = Modifier) {
 
     SectionContainer(
         title = "백업",
-        subtitle = "BlockStore + Passkey 로 키 share 보관",
+        subtitle = "Google Drive + Passkey 로 키 share 보관",
         modifier = modifier,
     ) {
         Text(
-            "PENDING 상태인 share (tb_pending_backup) 를 BlockStore 로 일괄 sync. Passkey 인증이 필요할 수 있습니다.",
+            "PENDING 상태인 share (tb_pending_backup) 를 Google Drive 로 일괄 sync. Passkey 인증이 필요할 수 있습니다.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -70,22 +70,28 @@ fun BackupSection(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = { wallet.dumpBlockStore() },
-            enabled = state.sdkInitialized,
+            onClick = { activity?.let { wallet.dumpBackup(it) } },
+            enabled = state.sdkInitialized && !state.backupDumpLoading,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Block Store dump")
+            if (state.backupDumpLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            else Text("Backup dump")
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = { wallet.clearBackup() },
-            enabled = state.sdkInitialized,
+            onClick = { activity?.let { wallet.clearBackup(it) } },
+            enabled = state.sdkInitialized && !state.backupClearLoading,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Backup 전체 삭제", color = MaterialTheme.colorScheme.error)
+            if (state.backupClearLoading) CircularProgressIndicator(
+                Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.error,
+            )
+            else Text("Backup 전체 삭제", color = MaterialTheme.colorScheme.error)
         }
 
-        state.blockStoreDump?.let { dump ->
+        state.backupDump?.let { dump ->
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier

@@ -41,12 +41,10 @@ class WalletError implements Exception {
       WalletError(4202, 'Restore failed: $detail', cause);
   factory WalletError.noKeyShareToBackup() => const WalletError(
         4204,
-        'No local key share available to back up. Call createAddress() to create a new wallet, or restore() to recover from another device backup (same OS only — iOS ↔ Android cross-platform recovery is not supported).',
+        'No wallet to back up on this device. Call createAddress() to create a new wallet, or restore() to recover an existing one first.',
       );
-  factory WalletError.noKeyShareToRestore() => const WalletError(
-        4205,
-        "Nothing to restore. Either no backup exists for this device's cloud account, or every backed-up wallet is already present locally on this device. If you expected to recover wallets from another platform, note that iOS ↔ Android cross-platform recovery is not supported.",
-      );
+  factory WalletError.noKeyShareToRestore(String detail) =>
+      WalletError(4205, detail);
   factory WalletError.delegationFailed(String detail, [Object? cause]) =>
       WalletError(4301, 'Delegation failed: $detail', cause);
   factory WalletError.approvalFailed(String detail, [Object? cause]) =>

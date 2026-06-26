@@ -13,7 +13,7 @@ AuthHandler(Dart)        ◀invoke── AuthHandler.requestChallenge (역방향
 ```
 
 - 채널: `com.dsrv.wallet.sdk/api`
-- 백업/Passkey/생체인증/MPC = native 그대로 동작 (iOS iCloud Keychain, Android Block Store)
+- 백업/Passkey/생체인증/MPC = native 그대로 동작 (iOS iCloud Keychain, Android Google Drive)
 - iOS Swift 6 / Android 동시성 수정 등 native 개선사항을 자동 상속
 
 ## 셋업 요구사항
@@ -77,12 +77,12 @@ final broadcast = (await DSRVWallet.broadcastTx(
   txId: build.txId,          // buildTx 응답의 txId 를 그대로
 )).getOrThrow();
 
-await DSRVWallet.delegate(address: key.address);  // List<TxHashResult>
+await DSRVWallet.delegate(address: key.address);  // List<ChainTxResult>
 await DSRVWallet.revoke(address: key.address);
-await DSRVWallet.approve(address: key.address, chainId: '11155111',
-    tokenAddresses: ['0xUSDC...', '0xUSDT...']);
+// amount: 'MAX' = unbounded permit2 권한, '0' = 권한 해제. SDK 가 toUpperCase() 로 정규화.
+await DSRVWallet.approve(address: key.address, amount: 'MAX'); // List<ChainTxResult>
 
-await DSRVWallet.backup();                         // iCloud / Block Store
+await DSRVWallet.backup();                         // iCloud / Google Drive
 final restored = (await DSRVWallet.restore()).getOrThrow(); // List<RestoredKey>
 
 // 사용자 전환 — 다음 initialize() 가 다른 userCredential 로 새로 인증되게 함 (로컬 DB 유지)
@@ -114,7 +114,7 @@ class MyAuthHandler implements AuthHandler {
 ## 주의
 
 - 이 플러그인은 native 코드를 **바이너리로** 동봉합니다 (Android=난독화 AAR, iOS=xcframework). 새 SDK 버전을 받으면 해당 바이너리(`android/repo/`, `ios/Frameworks/`)만 교체하면 됩니다.
-- 백업/복원은 OS 클라우드(iCloud/Block Store) 기반이며 passphrase 방식이 아닙니다.
+- 백업/복원은 OS 클라우드(iCloud/Google Drive) 기반이며 passphrase 방식이 아닙니다.
 
 ## 문의
 

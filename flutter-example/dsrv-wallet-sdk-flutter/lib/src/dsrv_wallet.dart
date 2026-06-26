@@ -247,7 +247,7 @@ class DSRVWallet {
     });
   }
 
-  /// 보류 중인 keyShare 를 OS 클라우드(iCloud / Block Store)에 백업.
+  /// 보류 중인 keyShare 를 OS 클라우드(iCloud / Google Drive)에 백업.
   static Future<WalletResult<void>> backup() {
     return _guard(() async {
       await NativeBridge.invoke<void>('backup');

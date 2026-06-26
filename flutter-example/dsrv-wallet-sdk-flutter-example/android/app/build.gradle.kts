@@ -22,8 +22,9 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // example 의 effective minSdk 는 Flutter framework 기본값(현재 24)을 따름.
+        // dsrv_wallet_sdk 플러그인 자체는 minSdk 23 (Android 6.0) 지원 — SDK 통합 앱에서
+        // 23 이 필요하면 이 값을 23 으로 override.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

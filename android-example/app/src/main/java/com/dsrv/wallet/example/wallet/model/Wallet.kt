@@ -15,6 +15,7 @@ import com.dsrv.wallet.sdk.DSRVWallet
 import com.dsrv.wallet.sdk.UserCredential
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -84,16 +85,23 @@ class Wallet(application: Application) : AndroidViewModel(application) {
 
     /**
      * userId 를 변경한다 (사용자 전환).
-     * 이미 SDK 초기화 상태라면 [DSRVWallet.reset] 으로 `initialized` 플래그를 풀어 다음
-     * [initializeSdk] 가 새 [UserCredential] 로 진행되게 한다. 로컬 DB(`tb_tokens` 포함)는
-     * 보존되며, 새 userId 는 자신의 token row 가 없어 자연스럽게 재인증 흐름을 탄다.
+     *
+     * 진행 중인 init job 이 있으면 cancel 하고 [DSRVWallet.reset] 으로 `initialized` 플래그를 풀어
+     * 다음 [initializeSdk] 가 새 [UserCredential] 로 진행되게 한다. cancel 없이 reset 만 부르면
+     * 이전 init 의 늦은 완료가 새 userId 의 uiState 를 stale 결과로 덮어쓰는 race 가 발생한다
+     * (실제로 "A 로그인 → 뒤로 → B 로그인" 시 첫 시도가 정상 동작하지 않던 회귀의 원인).
+     *
+     * 로컬 DB(`tb_tokens` 포함)는 보존되며, 새 userId 는 자신의 token row 가 없어 자연스럽게
+     * 재인증 흐름을 탄다.
      */
     fun changeUserId(newUserId: String) {
         val trimmed = newUserId.trim()
         if (trimmed.isEmpty() || trimmed == userId) return
 
-        // 다른 사용자 전환: SDK reset → 다음 initialize() 가 새 userCredential 로 진행되도록.
-        if (uiState.sdkInitialized) {
+        // 다른 사용자 전환: 진행 중 init / setupStatus batch job cancel → SDK reset → 다음 initialize().
+        if (uiState.sdkInitialized || uiState.sdkInitializing) {
+            initJob?.cancel()
+            setupStatusJob?.cancel()
             DSRVWallet.reset()
             publicKey = ""
             address = ""
@@ -118,9 +126,20 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(logs = emptyList())
     }
 
+    /**
+     * 진행 중인 init coroutine — 사용자 전환 / reset 시 cancel 해 stale 결과가 새 state 를 덮어쓰는 것 방지.
+     */
+    private var initJob: Job? = null
+
+    /**
+     * 진행 중인 setupStatus batch fetch job — 빠른 계정 전환 / 재호출 시 cancel 해 stale batch 결과가
+     * 최신 getAccountList 의 [WalletUiState.addressSetupStatusMap] 을 덮어쓰는 것 방지.
+     */
+    private var setupStatusJob: Job? = null
+
     private fun initializeSdk() {
         addLog("▶ initialize")
-        viewModelScope.launch(Dispatchers.IO) {
+        initJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val authHandler = MyAuthHandler(customerBackendUrl)
                 val userCredential = UserCredential(
@@ -155,6 +174,10 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                 } else {
                     throw Exception(result.errorOrNull()?.message ?: "SDK 초기화 실패")
                 }
+            } catch (t: CancellationException) {
+                // 사용자 전환 등으로 명시적으로 cancel 된 경우 — 새 init 이 이미 진행 중이므로
+                // uiState 를 건드리지 말고 그대로 throw (coroutine cancel 정상 종료).
+                throw t
             } catch (t: Throwable) {
                 Log.e(TAG, "SDK init failed", t)
                 withContext(Dispatchers.Main) {
@@ -183,6 +206,8 @@ class Wallet(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetWallet() {
+        initJob?.cancel()
+        setupStatusJob?.cancel()
         if (uiState.sdkInitialized) DSRVWallet.reset()
         publicKey = ""
         address = ""
@@ -237,11 +262,44 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     uiState = uiState.copy(accounts = list, selectedAccountId = selected)
                     addLog("✓ getAccountList count=${list.size} (selected=${selected ?: "none"})")
                     list.forEach { addLog("  accountId=${it.accountId}, label=${it.label}, addresses=${it.addresses.size}") }
+                    // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
+                    fetchAllSetupStatuses(list)
                 } else {
                     val error = result.errorOrNull()
                     uiState = uiState.copy(accountsError = error?.message)
                     addLog("✗ getAccountList FAILED: ${error?.message}")
                 }
+            }
+        }
+    }
+
+    /**
+     * 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [WalletUiState.addressSetupStatusMap] 채움.
+     * `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출
+     * 추가 — wallet 수가 많을 때 (10+) slow 할 수 있으므로 향후 lazy / virtualized 호출 검토 여지.
+     */
+    private fun fetchAllSetupStatuses(accounts: List<com.dsrv.wallet.sdk.AccountInfo>) {
+        // 이전 batch fetch 가 진행 중이면 cancel — stale 결과가 새 호출의 map 을 덮어쓰지 못하도록.
+        setupStatusJob?.cancel()
+        setupStatusJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val pairs: List<Pair<String, List<com.dsrv.wallet.sdk.ChainSetupStatus>>> = coroutineScope {
+                    accounts.flatMap { acc ->
+                        acc.addresses.map { addr ->
+                            async<Pair<String, List<com.dsrv.wallet.sdk.ChainSetupStatus>>?> {
+                                val r = DSRVWallet.getSetupStatus(acc.accountId, addr.addressId)
+                                if (r.isSuccess) addr.addressId to (r.getOrNull() ?: emptyList()) else null
+                            }
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+                withContext(Dispatchers.Main) {
+                    uiState = uiState.copy(addressSetupStatusMap = pairs.toMap())
+                    addLog("⚙ setupStatus batch fetched (${pairs.size}/${accounts.sumOf { it.addresses.size }})")
+                }
+            } catch (t: CancellationException) {
+                // 새 batch 가 이미 진행 중이므로 stale 결과 반영 skip.
+                throw t
             }
         }
     }
@@ -409,7 +467,13 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                 return
             }
 
-        uiState = uiState.copy(transferLoading = true, transferError = null)
+        uiState = uiState.copy(
+            transferLoading = true,
+            transferError = null,
+            lastTxHash = null,
+            lastTxStatus = null,
+            lastBatchTxId = null,
+        )
         val label = symbol.ifEmpty { if (isNative) "native" else "token" }
         addLog("▶ transfer($label, chainId=$chainId, to=${recipient.take(10)}…, amount=$humanAmount → $amount base)")
 
@@ -453,7 +517,12 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                 )
 
                 withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(transferLoading = false, lastTxHash = broadcast.txHash)
+                    uiState = uiState.copy(
+                        transferLoading = false,
+                        lastTxHash = broadcast.txHash,
+                        lastTxStatus = broadcast.status.takeIf { it.isNotEmpty() },
+                        lastBatchTxId = broadcast.batchTxId.takeIf { it.isNotEmpty() },
+                    )
                     val hash = broadcast.txHash
                     if (hash != null) {
                         addLog("✓ transfer txHash=$hash (status=${broadcast.status})")
@@ -684,7 +753,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         }
 
         uiState = uiState.copy(backupLoading = true, backupError = null, backupResult = null)
-        addLog("▶ backup (BlockStore + Passkey)")
+        addLog("▶ backup (Google Drive + Passkey)")
 
         viewModelScope.launch(Dispatchers.IO) {
             val result = DSRVWallet.backup(activity)
@@ -702,30 +771,28 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun dumpBlockStore() {
-        if (!uiState.sdkInitialized) return
-        addLog("▶ dumpBlockStore()")
-        viewModelScope.launch(Dispatchers.IO) {
-            val dump = runCatching { DSRVWallet.dumpBlockStoreForDebug() }
+    fun dumpBackup(activity: FragmentActivity) {
+        if (!uiState.sdkInitialized || uiState.backupDumpLoading) return
+        addLog("▶ dumpBackup()")
+        uiState = uiState.copy(backupDumpLoading = true)
+        viewModelScope.launch {
+            val dump = runCatching { DSRVWallet.dumpBackupForDebug(activity) }
                 .getOrElse { "dump failed: ${it.message}" }
-            withContext(Dispatchers.Main) {
-                uiState = uiState.copy(blockStoreDump = dump)
-                addLog("✓ dumpBlockStore (${dump.length}B)")
-            }
+            uiState = uiState.copy(backupDump = dump, backupDumpLoading = false)
+            addLog("✓ dumpBackup (${dump.length}B)")
         }
     }
 
-    fun clearBackup() {
-        if (!uiState.sdkInitialized) return
+    fun clearBackup(activity: FragmentActivity) {
+        if (!uiState.sdkInitialized || uiState.backupClearLoading) return
         addLog("▶ clearBackupForDebug()")
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { DSRVWallet.clearBackupForDebug() }
-            val dump = runCatching { DSRVWallet.dumpBlockStoreForDebug() }
+        uiState = uiState.copy(backupClearLoading = true)
+        viewModelScope.launch {
+            runCatching { DSRVWallet.clearBackupForDebug(activity) }
+            val dump = runCatching { DSRVWallet.dumpBackupForDebug(activity) }
                 .getOrElse { "dump failed: ${it.message}" }
-            withContext(Dispatchers.Main) {
-                uiState = uiState.copy(blockStoreDump = dump)
-                addLog("✓ backup 전체 삭제 완료")
-            }
+            uiState = uiState.copy(backupDump = dump, backupClearLoading = false)
+            addLog("✓ backup 전체 삭제 완료")
         }
     }
 
@@ -1019,7 +1086,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ===== Restore (BlockStore + Passkey) =====
+    // ===== Restore (Google Drive + Passkey) =====
 
     fun restore(activity: FragmentActivity) {
         if (!uiState.sdkInitialized) {
@@ -1028,7 +1095,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         }
 
         uiState = uiState.copy(restoreLoading = true, restoreError = null, restoreResult = null)
-        addLog("▶ restore (BlockStore + Passkey)")
+        addLog("▶ restore (Google Drive + Passkey)")
 
         viewModelScope.launch(Dispatchers.IO) {
             val result = DSRVWallet.restore(activity)

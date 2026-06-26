@@ -41,12 +41,16 @@ struct WalletUiState {
     var transferLoading: Bool = false
     var transferError: String? = nil
     var lastTxHash: String? = nil
+    var lastTxStatus: String? = nil
+    var lastBatchTxId: String? = nil
 
     // Backup
     var backupLoading: Bool = false
     var backupError: String? = nil
     var backupResult: String? = nil
     var keychainDump: String? = nil
+    var keychainDumpLoading: Bool = false
+    var keychainClearLoading: Bool = false
 
     // Restore
     var restoreLoading: Bool = false
@@ -68,6 +72,9 @@ struct WalletUiState {
     var setupStatusLoading: Bool = false
     var setupStatusError: String? = nil
     var setupStatus: [ChainSetupStatus] = []
+    /// wallet list 화면의 위임/승인 chip 표시용 — addressId → ChainSetupStatus 목록.
+    /// getAccountList 직후 batch fetch 로 채워짐 (N 회 getSetupStatus 호출).
+    var addressSetupStatusMap: [String: [ChainSetupStatus]] = [:]
 
     // Payment (customer-backend POST /payments — TOPUP)
     var paymentLoading: Bool = false
@@ -115,6 +122,13 @@ final class Wallet: ObservableObject {
 
     private var authHandler: MyAuthHandler?
 
+    /// 진행 중인 init Task — 사용자 전환 / reset 시 cancel 해 stale 결과가 새 state 를 덮어쓰는 것 방지.
+    private var initTask: Task<Void, Never>?
+
+    /// 진행 중인 setupStatus batch fetch Task — 빠른 계정 전환 / 재호출 시 cancel 해 stale batch
+    /// 결과가 최신 getAccountList 의 `addressSetupStatusMap` 을 덮어쓰는 것 방지.
+    private var setupStatusTask: Task<Void, Never>?
+
     init() {
         userId = prefs.string(forKey: Self.keyUserId) ?? ""
     }
@@ -150,13 +164,19 @@ final class Wallet: ObservableObject {
         ].joined(separator: "-")
     }
 
-    /// userId 를 변경한다 (사용자 전환). SDK reset → 다음 retryInitialize() 에서
-    /// 새 userCredential 로 재인증된다.
+    /// userId 를 변경한다 (사용자 전환).
+    ///
+    /// 진행 중인 init Task 가 있으면 cancel 하고 [DSRVWallet.reset] 으로 `initialized` 플래그를 풀어
+    /// 다음 [retryInitialize] 가 새 [UserCredential] 로 진행되게 한다. cancel 없이 reset 만 부르면
+    /// 이전 init 의 늦은 완료가 새 userId 의 uiState 를 stale 결과로 덮어쓰는 race 가 발생한다
+    /// (Android 와 동일 회귀 — "A 로그인 → 뒤로 → B 로그인" 시 첫 시도가 정상 동작하지 않던 케이스).
     func changeUserId(_ newUserId: String) {
         let trimmed = newUserId.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty || trimmed == userId { return }
 
-        if uiState.sdkInitialized {
+        if uiState.sdkInitialized || uiState.sdkInitializing {
+            initTask?.cancel()
+            setupStatusTask?.cancel()
             Task { await DSRVWallet.reset() }
             publicKey = ""
             address = ""
@@ -170,6 +190,8 @@ final class Wallet: ObservableObject {
     }
 
     func resetWallet() {
+        initTask?.cancel()
+        setupStatusTask?.cancel()
         if uiState.sdkInitialized {
             Task { await DSRVWallet.reset() }
         }
@@ -221,6 +243,9 @@ final class Wallet: ObservableObject {
             rpId: Config.backupRpId
         )
 
+        // 사용자 전환 등으로 cancel 되었으면 새 init 이 이미 진행 중이므로 uiState 갱신 skip.
+        if Task.isCancelled { return }
+
         switch result {
         case .success:
             uiState.sdkInitialized = true
@@ -244,7 +269,7 @@ final class Wallet: ObservableObject {
         }
         uiState.sdkInitializing = true
         uiState.sdkInitError = nil
-        Task { await initializeSdk() }
+        initTask = Task { await initializeSdk() }
     }
 
     // MARK: - Account
@@ -293,10 +318,44 @@ final class Wallet: ObservableObject {
                 for acc in list {
                     addLog("  accountId=\(acc.accountId), label=\(acc.label), addresses=\(acc.addresses.count)")
                 }
+                // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
+                fetchAllSetupStatuses(accounts: list)
             case .failure(let error):
                 uiState.accountsError = error.description
                 addLog("✗ getAccountList FAILED: \(error.description)")
             }
+        }
+    }
+
+    /// 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [addressSetupStatusMap] 채움.
+    /// `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출.
+    private func fetchAllSetupStatuses(accounts: [AccountInfo]) {
+        // 이전 batch fetch 가 진행 중이면 cancel — stale 결과가 새 호출의 map 을 덮어쓰지 못하도록.
+        setupStatusTask?.cancel()
+        // main actor isolated closure 가 group.addTask 의 sending 인자로 가능하도록 String 만 캡쳐.
+        let targets: [(accountId: String, addressId: String)] = accounts.flatMap { acc in
+            acc.addresses.map { (acc.accountId, $0.addressId) }
+        }
+        setupStatusTask = Task {
+            var collected: [String: [ChainSetupStatus]] = [:]
+            await withTaskGroup(of: (String, [ChainSetupStatus])?.self) { group in
+                for target in targets {
+                    let accountId = target.accountId
+                    let addressId = target.addressId
+                    group.addTask {
+                        let r = await DSRVWallet.getSetupStatus(accountId: accountId, addressId: addressId)
+                        if case .success(let list) = r { return (addressId, list) }
+                        return nil
+                    }
+                }
+                for await pair in group {
+                    if let (id, list) = pair { collected[id] = list }
+                }
+            }
+            // 새 batch 가 이미 진행 중이라면 stale 결과 반영 skip.
+            if Task.isCancelled { return }
+            uiState.addressSetupStatusMap = collected
+            addLog("⚙ setupStatus batch fetched (\(collected.count)/\(targets.count))")
         }
     }
 
@@ -452,6 +511,9 @@ final class Wallet: ObservableObject {
 
         uiState.transferLoading = true
         uiState.transferError = nil
+        uiState.lastTxHash = nil
+        uiState.lastTxStatus = nil
+        uiState.lastBatchTxId = nil
         addLog("▶ transfer(\(symbol.isEmpty ? (isNative ? "native" : "token") : symbol), chainId=\(chainId), to=\(recipient.prefix(10))…, amount=\(humanAmount) → \(amount) base)")
 
         let repo = TransferRepository(backendUrl: customerBackendUrl)
@@ -496,6 +558,8 @@ final class Wallet: ObservableObject {
                 )
                 uiState.transferLoading = false
                 uiState.lastTxHash = broadcast.txHash
+                uiState.lastTxStatus = broadcast.status.isEmpty ? nil : broadcast.status
+                uiState.lastBatchTxId = broadcast.batchTxId.isEmpty ? nil : broadcast.batchTxId
                 if let hash = broadcast.txHash {
                     addLog("✓ transfer txHash=\(hash) (status=\(broadcast.status))")
                 } else {
@@ -727,19 +791,28 @@ final class Wallet: ObservableObject {
     // MARK: - Backup / Restore
 
     func dumpKeychain() {
-        guard uiState.sdkInitialized else { return }
+        guard uiState.sdkInitialized, !uiState.keychainDumpLoading else { return }
         addLog("▶ dumpKeychain()")
-        let dump = DSRVWallet.dumpBackupForDebug()
-        uiState.keychainDump = dump
-        addLog("✓ dumpKeychain (\(dump.count)B)")
+        uiState.keychainDumpLoading = true
+        // Keychain 호출은 보통 빠르지만 spinner 가 잠깐이라도 시각 피드백을 주도록 async hop.
+        Task { @MainActor in
+            let dump = DSRVWallet.dumpBackupForDebug()
+            uiState.keychainDump = dump
+            uiState.keychainDumpLoading = false
+            addLog("✓ dumpKeychain (\(dump.count)B)")
+        }
     }
 
     func clearBackup() {
-        guard uiState.sdkInitialized else { return }
+        guard uiState.sdkInitialized, !uiState.keychainClearLoading else { return }
         addLog("▶ clearBackupForDebug()")
-        DSRVWallet.clearBackupForDebug()
-        uiState.keychainDump = DSRVWallet.dumpBackupForDebug()
-        addLog("✓ backup 전체 삭제 완료")
+        uiState.keychainClearLoading = true
+        Task { @MainActor in
+            DSRVWallet.clearBackupForDebug()
+            uiState.keychainDump = DSRVWallet.dumpBackupForDebug()
+            uiState.keychainClearLoading = false
+            addLog("✓ backup 전체 삭제 완료")
+        }
     }
 
     func backup() {

@@ -167,7 +167,7 @@ public struct AccountResult {
   public let label: Swift.String
   public init(accountId: Swift.String, label: Swift.String)
 }
-public struct TokenApproval {
+public struct TokenApproval : Swift.Sendable {
   public let token: Swift.String
   public let approved: Swift.Bool
   public let amount: Swift.String
@@ -175,7 +175,7 @@ public struct TokenApproval {
   public let erc20Allowance: Swift.String
   public init(token: Swift.String, approved: Swift.Bool, amount: Swift.String, expiration: Swift.Int64, erc20Allowance: Swift.String)
 }
-public struct ChainSetupStatus {
+public struct ChainSetupStatus : Swift.Sendable {
   public let chainId: Swift.String
   public let delegated: Swift.Bool
   public let approvals: [dsrv_wallet_sdk_ios.TokenApproval]
@@ -188,9 +188,8 @@ public struct AddressInfo {
   public let publicKey: Swift.String
   public let label: Swift.String?
   public let chainType: Swift.String
-  public let isAvailable: Swift.Bool
-  public let setupStatus: [dsrv_wallet_sdk_ios.ChainSetupStatus]?
-  public init(accountId: Swift.String, addressId: Swift.String, address: Swift.String, publicKey: Swift.String, label: Swift.String? = nil, chainType: Swift.String, isAvailable: Swift.Bool = false, setupStatus: [dsrv_wallet_sdk_ios.ChainSetupStatus]? = nil)
+  public let hasLocalKeyShare: Swift.Bool
+  public init(accountId: Swift.String, addressId: Swift.String, address: Swift.String, publicKey: Swift.String, label: Swift.String? = nil, chainType: Swift.String, hasLocalKeyShare: Swift.Bool = false)
 }
 public struct AccountInfo {
   public let accountId: Swift.String
@@ -229,7 +228,7 @@ public enum WalletError : Foundation.LocalizedError, Swift.CustomStringConvertib
   case restoreFailed(Swift.String)
   case passkeyPrfUnavailable(Swift.String)
   case noKeyShareToBackup
-  case noKeyShareToRestore
+  case noKeyShareToRestore(Swift.String)
   case networkError(Swift.String)
   case mpcError(Swift.String)
   case unknown(Swift.String)

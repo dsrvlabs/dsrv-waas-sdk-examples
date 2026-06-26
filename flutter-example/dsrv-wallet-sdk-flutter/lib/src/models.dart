@@ -196,7 +196,7 @@ class TokenApproval {
       );
 }
 
-/// chain 별 위임/승인 상태 — [getSetupStatus] 및 [AddressInfo.setupStatus] 의 entry.
+/// chain 별 위임/승인 상태 — [getSetupStatus] 의 entry.
 ///
 /// [delegated] 는 EIP-7702 위임 여부, [approvals] 는 token 별 상세.
 class ChainSetupStatus {
@@ -234,11 +234,7 @@ class AddressInfo {
   /// [getAccountList] 호출 시점의 snapshot — 이후 [restore] 등으로 share 가 채워지면
   /// 다음 [getAccountList] 호출에서 갱신된다. true 면 sign / transfer 등 바로 호출 가능,
   /// false 면 다른 디바이스에서 만들어진 address 라 [restore] 가 필요.
-  final bool isAvailable;
-
-  /// chain 별 위임/승인 상태 (additive — native 가 채워주면 non-null, 아니면 null).
-  /// [getSetupStatus] 와 동일한 shape. snapshot 이므로 갱신은 다음 [getAccountList] 호출에서.
-  final List<ChainSetupStatus>? setupStatus;
+  final bool hasLocalKeyShare;
 
   const AddressInfo({
     required this.accountId,
@@ -247,8 +243,7 @@ class AddressInfo {
     required this.publicKey,
     this.label,
     required this.chainType,
-    this.isAvailable = false,
-    this.setupStatus,
+    this.hasLocalKeyShare = false,
   });
 
   factory AddressInfo.fromMap(Map<dynamic, dynamic> map) => AddressInfo(
@@ -258,10 +253,7 @@ class AddressInfo {
         publicKey: map['publicKey'] as String,
         label: map['label'] as String?,
         chainType: map['chainType'] as String,
-        isAvailable: (map['isAvailable'] as bool?) ?? false,
-        setupStatus: (map['setupStatus'] as List?)
-            ?.map((e) => ChainSetupStatus.fromMap(e as Map))
-            .toList(),
+        hasLocalKeyShare: (map['hasLocalKeyShare'] as bool?) ?? false,
       );
 }
 

@@ -225,8 +225,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 "publicKey": $0.publicKey,
                 "label": $0.label,
                 "chainType": $0.chainType,
-                "isAvailable": $0.isAvailable,
-                "setupStatus": $0.setupStatus?.map(self.chainSetupStatusMap),
+                "hasLocalKeyShare": $0.hasLocalKeyShare,
             ] },
         ]
     }

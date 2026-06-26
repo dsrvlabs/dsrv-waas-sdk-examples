@@ -157,11 +157,29 @@ class _TransferSectionState extends State<TransferSection> {
         if (wallet.transferError != null)
           Text('⚠ ${wallet.transferError}',
               style: TextStyle(fontSize: 12, color: errorColor)),
-        if (wallet.lastTxHash != null) ...[
-          Text('✓ 전송 완료',
+        // 전송 결과 — txHash (있을 때) + status + batchTxId (있을 때).
+        // bundler 경로 (GS_ON) 에선 txHash 가 null 이고 status="SIGNED" + batchTxId 가 채워짐.
+        if (wallet.lastTxHash != null ||
+            wallet.lastTxStatus != null ||
+            wallet.lastBatchTxId != null) ...[
+          Text('✓ 전송 결과',
               style: TextStyle(
                   fontSize: 12, color: Theme.of(context).colorScheme.primary)),
-          CopyableText(wallet.lastTxHash!),
+          if (wallet.lastTxHash != null) ...[
+            Text('TxHash',
+                style: TextStyle(
+                    fontSize: 10, color: Theme.of(context).hintColor)),
+            CopyableText(wallet.lastTxHash!),
+          ],
+          if (wallet.lastTxStatus != null)
+            Text('Status: ${wallet.lastTxStatus}',
+                style: const TextStyle(fontSize: 12)),
+          if (wallet.lastBatchTxId != null) ...[
+            Text('BatchTxId',
+                style: TextStyle(
+                    fontSize: 10, color: Theme.of(context).hintColor)),
+            CopyableText(wallet.lastBatchTxId!),
+          ],
         ],
         if (wallet.transferError != null) ErrorLine(wallet.transferError!),
       ],

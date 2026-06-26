@@ -15,7 +15,7 @@ class BackupSection extends StatelessWidget {
 
     return SectionCard(
       '백업',
-      subtitle: 'pending share3 들을 iCloud Keychain / Block Store 에 일괄 sync',
+      subtitle: 'pending share3 들을 iCloud Keychain / Google Drive 에 일괄 sync',
       children: [
         Text(
           'PENDING 상태인 share 를 클라우드에 일괄 sync 합니다. Passkey / 생체인증이 필요할 수 있습니다.',
@@ -36,7 +36,12 @@ class BackupSection extends StatelessWidget {
           height: 44,
           child: OutlinedButton(
             onPressed: wallet.busy('dump') ? null : wallet.dumpBackup,
-            child: const Text('Block Store / Keychain dump'),
+            child: wallet.busy('dump')
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Drive / Keychain dump'),
           ),
         ),
         SizedBox(
@@ -48,7 +53,12 @@ class BackupSection extends StatelessWidget {
               side: BorderSide(color: errorColor),
             ),
             onPressed: wallet.busy('clearBackup') ? null : wallet.clearBackup,
-            child: const Text('Backup 전체 삭제'),
+            child: wallet.busy('clearBackup')
+                ? SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: errorColor),
+                  )
+                : const Text('Backup 전체 삭제'),
           ),
         ),
         if (wallet.backupDump != null && wallet.backupDump!.isNotEmpty)

@@ -42,9 +42,23 @@ struct TransferSection: View {
             }
             .disabled(transferDisabled)
 
-            if let hash = wallet.uiState.lastTxHash {
-                Text("✓ 전송 완료").font(.caption).foregroundColor(.green)
-                CopyableText(text: hash, singleLine: true)
+            // 전송 결과 — txHash (있을 때) + status + batchTxId (있을 때).
+            // bundler 경로 (GS_ON) 에선 txHash 가 nil 이고 status="SIGNED" + batchTxId 가 채워짐.
+            if wallet.uiState.lastTxHash != nil
+                || wallet.uiState.lastTxStatus != nil
+                || wallet.uiState.lastBatchTxId != nil {
+                Text("✓ 전송 결과").font(.caption).foregroundColor(.green)
+                if let hash = wallet.uiState.lastTxHash {
+                    Text("TxHash").font(.caption2).foregroundStyle(.secondary)
+                    CopyableText(text: hash, singleLine: true)
+                }
+                if let status = wallet.uiState.lastTxStatus {
+                    Text("Status: \(status)").font(.caption)
+                }
+                if let batchTxId = wallet.uiState.lastBatchTxId {
+                    Text("BatchTxId").font(.caption2).foregroundStyle(.secondary)
+                    CopyableText(text: batchTxId, singleLine: true)
+                }
             }
             if let err = wallet.uiState.transferError {
                 ErrorLine(message: err)

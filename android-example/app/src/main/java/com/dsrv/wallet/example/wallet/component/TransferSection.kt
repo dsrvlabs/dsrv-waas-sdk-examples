@@ -105,10 +105,22 @@ fun TransferSection(modifier: Modifier = Modifier) {
             else Text("거래 확인")
         }
 
-        state.lastTxHash?.let {
+        // 전송 결과 — txHash (있을 때) + status + batchTxId (있을 때).
+        // bundler 경로 (GS_ON) 에선 txHash 가 null 이고 status="SIGNED" + batchTxId 가 채워짐.
+        if (state.lastTxHash != null || state.lastTxStatus != null || state.lastBatchTxId != null) {
             Spacer(Modifier.height(6.dp))
-            Text("✓ 전송 완료", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            CopyableText(text = it, singleLine = true)
+            Text("✓ 전송 결과", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+            state.lastTxHash?.let {
+                Text("TxHash", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CopyableText(text = it, singleLine = true)
+            }
+            state.lastTxStatus?.let {
+                Text("Status: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            state.lastBatchTxId?.let {
+                Text("BatchTxId", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CopyableText(text = it, singleLine = true)
+            }
         }
         state.transferError?.let {
             Spacer(Modifier.height(6.dp))

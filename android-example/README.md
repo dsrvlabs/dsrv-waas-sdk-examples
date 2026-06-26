@@ -362,13 +362,14 @@ fun refresh() {
 | `DSRVWallet.buildTx(...)` | 단계별 전송 1 — build hash | `WalletResult<TxBuildResult>` |
 | `DSRVWallet.sign(address, hashedMessage, signId, messageType)` | 단계별 전송 2 — MPC 서명 | `WalletResult<SignResult>` |
 | `DSRVWallet.broadcastTx(address, txId)` | 단계별 전송 3 — broadcast | `WalletResult<TxHashResult>` |
-| `DSRVWallet.delegate(address)` | EIP-7702 위임 (chain 일괄 처리) | `WalletResult<List<TxHashResult>>` |
-| `DSRVWallet.revoke(address)` | EIP-7702 위임 철회 (chain 일괄 처리) | `WalletResult<List<TxHashResult>>` |
-| `DSRVWallet.approve(address, chainId, tokenAddresses)` | 결제 토큰 multicall approve | `WalletResult<TxHashResult>` |
-| `DSRVWallet.backup(activity)` | PENDING share3 를 Block Store 에 cloud sync | `WalletResult<Unit>` |
-| `DSRVWallet.restore(activity)` | cloud sync 된 share3 로 지갑 복구 | `WalletResult<List<RestoredKey>>` |
-| `DSRVWallet.dumpBlockStoreForDebug()` | (디버그) Block Store 덤프 | `String` |
-| `DSRVWallet.clearBackupForDebug()` | (디버그) 모든 tier 백업 삭제 | `Unit` |
+| `DSRVWallet.delegate(address)` | EIP-7702 위임 (chain 일괄, 각 chain isSuccess 로 분기) | `WalletResult<List<ChainTxResult>>` |
+| `DSRVWallet.revoke(address)` | EIP-7702 위임 철회 (chain 일괄) | `WalletResult<List<ChainTxResult>>` |
+| `DSRVWallet.approve(address, amount: String)` | 결제 토큰 multicall approve. `amount` sentinel: `"MAX"` (unbounded) / `"0"` (revoke). SDK 가 uppercase 정규화. | `WalletResult<List<ChainTxResult>>` |
+| `DSRVWallet.getSetupStatus(accountId, addressId)` | chain 별 위임(EIP-7702) + token 별 approve(Permit2) 상태 단건 조회 | `WalletResult<List<ChainSetupStatus>>` |
+| `DSRVWallet.backup(activity)` | 디바이스의 모든 wallet share 를 Google Drive appDataFolder 에 sync — 호출할 때마다 이미 백업된 wallet 도 재업로드. share 가 한 건도 없으면 `NoKeyShareToBackup` 으로 실패 | `WalletResult<Unit>` |
+| `DSRVWallet.restore(activity)` | cloud sync 된 share3 로 지갑 복구. 가져올 wallet 이 0개면 `NoKeyShareToRestore` 로 실패 | `WalletResult<List<RestoredKey>>` |
+| `DSRVWallet.dumpBackupForDebug(activity)` | (디버그) 백업 저장소 덤프 | `String` |
+| `DSRVWallet.clearBackupForDebug(activity)` | (디버그) 모든 tier 백업 삭제 | `Unit` |
 | `DSRVWallet.reset()` | 사용자 전환 — 다음 `initialize()` 가 다른 `UserCredential` 로 진행되게 함 (로컬 DB 유지) | `Unit` |
 
 ---

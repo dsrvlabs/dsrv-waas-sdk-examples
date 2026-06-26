@@ -29,15 +29,18 @@ dsrv-wallet-sdk-ios-example/
 │       │   ├── RootView.swift                  # 루트 진입점 (Login | WalletList | WalletDetail | Feature)
 │       │   └── WalletScreen.swift              # 메뉴 기반 다단계 화면
 │       └── Components/
-│           ├── SdkSection.swift                # initialize 호출 UI
-│           ├── AccountSection.swift            # createAccount / getAccountList UI
+│           ├── AccountSection.swift            # createAccount / getAccountList UI (각 address 의 위임/승인 chip 표시)
 │           ├── ChainSection.swift              # getChainList + chain 선택 UI
+│           ├── AssetBalanceView.swift          # 단일 자산 잔액 + KRW 환산
+│           ├── AssetListView.swift             # 자산 목록 (WaaS account assets 기반)
 │           ├── TransferSection.swift           # 전송 UI (build → sign → broadcast)
 │           ├── PaymentSection.swift            # Topup 결제 UI (POST /payments)
 │           ├── DelegateSection.swift           # EIP-7702 delegate / revoke UI
 │           ├── ApproveSection.swift            # 토큰 approve UI
+│           ├── SetupStatusSection.swift        # getSetupStatus — chain 별 위임/승인 상태 (entry / wallet 변경 시 auto-refresh)
 │           ├── BackupSection.swift             # backup UI
 │           ├── RestoreSection.swift            # restore UI
+│           ├── HistorySection.swift            # 거래 내역 조회
 │           ├── LogSection.swift                # 실시간 로그
 │           ├── QRScannerView.swift             # QR 스캔
 │           ├── QRCodeView.swift                # QR 표시

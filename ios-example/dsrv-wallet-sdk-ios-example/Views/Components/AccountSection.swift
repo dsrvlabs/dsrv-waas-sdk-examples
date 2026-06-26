@@ -111,7 +111,7 @@ struct AccountSection: View {
                     if let label = addr.label, !label.isEmpty {
                         Text(label).font(.caption).foregroundStyle(.secondary)
                     }
-                    if let setupStatus = addr.setupStatus, !setupStatus.isEmpty {
+                    if let setupStatus = wallet.uiState.addressSetupStatusMap[addr.addressId], !setupStatus.isEmpty {
                         setupStatusChips(setupStatus)
                     }
                 }
@@ -123,7 +123,7 @@ struct AccountSection: View {
         .buttonStyle(.plain)
     }
 
-    /// getAccountList 가 반환한 주소별 setupStatus snapshot 을 위임·승인 요약 칩으로 표시.
+    /// Wallet 의 `addressSetupStatusMap` (batch fetched) 으로부터 받은 위임·승인 요약 칩 표시.
     @ViewBuilder
     private func setupStatusChips(_ setupStatus: [ChainSetupStatus]) -> some View {
         let total = setupStatus.count
