@@ -46,7 +46,7 @@ export class PaymentEndpointDto {
  * quote → paymentDigest 서명(고객사 PK) → execute 를 순차 처리하므로,
  * 클라이언트는 더 이상 서명/quote 결과를 첨부하지 않는다.
  *
- * <p><b>cross-chain (DNT-5965)</b>: source(출금) / destination(수령) 을 분리해 받는다.
+ * <p><b>cross-chain</b>: source(출금) / destination(수령) 을 분리해 받는다.
  * same-chain 결제는 source 와 destination 의 chainId 를 동일하게 보내면 된다.
  */
 export class PaymentRequestDto {

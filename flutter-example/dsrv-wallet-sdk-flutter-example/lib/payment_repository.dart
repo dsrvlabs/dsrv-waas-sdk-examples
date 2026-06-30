@@ -25,7 +25,7 @@ class PaymentRepository {
 
 /// `POST /payments` 의 한쪽 endpoint (출금=source / 수령=destination).
 ///
-/// cross-chain (DNT-5965): source 와 destination 이 서로 다른 체인일 수 있어 chain/token/주소를
+/// cross-chain: source 와 destination 이 서로 다른 체인일 수 있어 chain/token/주소를
 /// endpoint 단위로 받는다. 같은 USDC 라도 컨트랙트 주소는 체인마다 달라 [tokenAddress] 도 endpoint 별.
 class PaymentEndpoint {
   final int chainId;
@@ -47,7 +47,7 @@ class PaymentEndpoint {
       };
 }
 
-/// `POST /payments` request — Topup 결제 (cross-chain, DNT-5965).
+/// `POST /payments` request — Topup 결제 (cross-chain).
 ///
 /// 출금([source]) / 수령([destination]) 을 분리해 보낸다. same-chain 결제는 두 endpoint 의
 /// chainId/tokenAddress 를 동일하게 보내면 된다.

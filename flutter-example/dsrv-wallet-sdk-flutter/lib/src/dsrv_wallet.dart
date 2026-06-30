@@ -49,8 +49,12 @@ class DSRVWallet {
   /// 동작:
   /// - 내부 initialized 플래그를 false 로 되돌려 다음 [initialize] 가 idempotent 가드를
   ///   통과하도록 합니다.
-  /// - 로컬 DB (key share / account / pending backup / tokens) 와 백업 상태는 **유지** —
-  ///   같은 사용자로 다시 init 하면 기존 지갑/토큰을 그대로 재사용합니다.
+  /// - **현재 세션의 access / refresh 토큰을 삭제** — 로그아웃처럼 인증 세션을 끝냅니다.
+  ///   토큰을 남기면 다음 [initialize] 가 재인증을 건너뛰어 stale 토큰을 계속 쓰는데(백엔드
+  ///   재배포 후 게이트웨이가 `Bearer authentication failed` 로 거부하는 시나리오), 토큰을
+  ///   지워 다음 [initialize] 가 반드시 새 attestation 으로 유효한 토큰을 재발급하게 합니다.
+  /// - 로컬 DB 의 key share / account / pending backup 와 백업 상태는 **유지** — 지갑 자체는
+  ///   보존되고, 다음 init 에서 재인증만 다시 수행합니다.
   ///
   /// 호출 후 반드시 새 [UserCredential] 로 [initialize] 를 다시 호출하세요.
   static Future<void> reset() async {

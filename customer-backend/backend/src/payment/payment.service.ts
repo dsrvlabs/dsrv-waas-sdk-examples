@@ -146,7 +146,7 @@ export class PaymentService {
       const params = quote.params;
       // Payments stablecoin transaction create — TOPUP 분기는 paymentType=TOPUP 으로 트리거.
       //
-      // cross-chain (DNT-5965): source/destination 를 체인 단위로 분해 — paymentRail 대신
+      // cross-chain: source/destination 를 체인 단위로 분해 — paymentRail 대신
       // chainId, currency 대신 token (USDC 컨트랙트 주소가 체인별로 다름).
       // stablecoin 측이 quote 시점에 발급한 값을 그대로 echo:
       //   - onchainPayment.{paymentUuid, deadline, customerEpoch}: trade authoritative metadata

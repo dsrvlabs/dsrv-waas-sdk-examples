@@ -1,7 +1,7 @@
 import SwiftUI
 import dsrv_wallet_sdk_ios
 
-/// Android `PaymentSection.kt` 대응 — customer-backend `POST /payments` 호출 (cross-chain Topup, DNT-5965/5997).
+/// Android `PaymentSection.kt` 대응 — customer-backend `POST /payments` 호출 (cross-chain Topup).
 ///
 /// source(출금) / destination(수령) 의 chain·token·주소를 직접 입력할 수 있다. 비우면 기본값으로
 /// 폴백(source chain=선택 체인, fromAddress=내 지갑, fromTokenAddress=체인 USDC, destination=source 와 동일).
@@ -19,7 +19,6 @@ struct PaymentSection: View {
     @State private var krwGeneration = 0
     // source(출금) / destination(수령) 입력 — 비우면 기본값 폴백(placeholder 로 기본값 노출).
     @State private var sourceChainText = ""
-    @State private var fromAddressText = ""
     @State private var fromTokenText = ""
     @State private var destChainText = ""
     @State private var destTokenText = ""
@@ -28,7 +27,8 @@ struct PaymentSection: View {
 
     // 입력값이 비면 사용할 기본값 (= 기존 자동 도출 동작). placeholder 와 확정 전송에 함께 쓴다.
     private var resolvedSourceChain: String { sourceChainText.isEmpty ? chainId : sourceChainText }
-    private var resolvedFromAddress: String { fromAddressText.isEmpty ? wallet.address : fromAddressText }
+    // fromAddress 는 항상 현재 선택한 지갑 — 입력받지 않는다.
+    private var resolvedFromAddress: String { wallet.address }
     private var resolvedFromToken: String {
         fromTokenText.isEmpty ? (PaymentSection.usdcAddress(chainId: resolvedSourceChain) ?? "") : fromTokenText
     }
@@ -65,59 +65,53 @@ struct PaymentSection: View {
             }
 
             // ── source (출금) ── chain 은 가져온 목록에서 선택, 나머지는 비우면 placeholder 의 기본값.
-            Text("source (출금)")
-                .font(.subheadline.weight(.medium))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack {
-                Text("chain").font(.footnote).foregroundStyle(.secondary)
-                Spacer()
-                Picker("chain", selection: Binding(
-                    get: { resolvedSourceChain },
-                    set: { sourceChainText = $0 }
-                )) {
-                    ForEach(wallet.uiState.chains, id: \.chainId) { c in
-                        Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+            // fromAddress 는 현재 선택한 지갑 고정 — 입력받지 않는다.
+            groupCard {
+                Text("source (출금)")
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                chainField {
+                    Picker("chain", selection: Binding(
+                        get: { resolvedSourceChain },
+                        set: { sourceChainText = $0 }
+                    )) {
+                        ForEach(wallet.uiState.chains, id: \.chainId) { c in
+                            Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+                        }
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-            }
-            TextField(wallet.address.isEmpty ? "fromAddress (0x…)" : "fromAddress (기본: 내 지갑)", text: $fromAddressText)
+                TextField(
+                    "fromTokenAddress (기본: \(PaymentSection.usdcAddress(chainId: resolvedSourceChain) ?? "0x…"))",
+                    text: $fromTokenText
+                )
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
-            TextField(
-                "fromTokenAddress (기본: \(PaymentSection.usdcAddress(chainId: resolvedSourceChain) ?? "0x…"))",
-                text: $fromTokenText
-            )
-            .textFieldStyle(.roundedBorder)
-            .autocorrectionDisabled()
+            }
 
             // ── destination (수령) ── chain/token 비우면 source 와 동일.
-            Text("destination (수령)")
-                .font(.subheadline.weight(.medium))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 8) {
-                TextField("to (SETTLEMENT 지갑)", text: $to)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                Button("QR 스캔") { scannerOpen = true }
-                    .font(.footnote)
-            }
-            HStack {
-                Text("chain").font(.footnote).foregroundStyle(.secondary)
-                Spacer()
-                Picker("chain", selection: $destChainText) {
-                    Text("source 와 동일").tag("")
-                    ForEach(wallet.uiState.chains, id: \.chainId) { c in
-                        Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+            groupCard {
+                Text("destination (수령)")
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    TextField("toAddress", text: $to)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                    Button("QR 스캔") { scannerOpen = true }
+                        .font(.footnote)
+                }
+                chainField {
+                    Picker("chain", selection: $destChainText) {
+                        Text("source 와 동일").tag("")
+                        ForEach(wallet.uiState.chains, id: \.chainId) { c in
+                            Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+                        }
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
+                TextField("tokenAddress (비우면 source 와 동일)", text: $destTokenText)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
             }
-            TextField("tokenAddress (비우면 source 와 동일)", text: $destTokenText)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
 
             // ── 금액 ── destination 과 구분되는 별도 그룹.
             Text("금액")
@@ -185,7 +179,7 @@ struct PaymentSection: View {
                 wallet.pay(
                     sourceChainIdInput: sourceChainText,
                     sourceTokenInput: resolvedFromToken,
-                    fromInput: fromAddressText,
+                    fromInput: "",
                     destChainIdInput: destChainText,
                     destTokenInput: destTokenText,
                     toInput: to,
@@ -202,6 +196,32 @@ struct PaymentSection: View {
                     + "dest: chain \(destChainDisplay) · \(to) · \(destTokenDisplay)\n\n"
                     + "⚠ 결제 후 되돌릴 수 없습니다."
             )
+        }
+    }
+
+    /// source / destination 을 감싸는 옅은 카드 컨테이너.
+    @ViewBuilder
+    private func groupCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    /// "chain" 라벨 아래에 선택기를 세로로 배치 — source/destination 공통 레이아웃.
+    @ViewBuilder
+    private func chainField<Content: View>(@ViewBuilder _ picker: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("chain").font(.footnote).foregroundStyle(.secondary)
+            picker()
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

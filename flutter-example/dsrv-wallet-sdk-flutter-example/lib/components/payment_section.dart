@@ -8,7 +8,7 @@ import '../wallet_state.dart';
 import 'qr_scanner_sheet.dart';
 
 /// Android `PaymentSection.kt` / iOS `PaymentSection.swift` 대응 —
-/// customer-backend `POST /payments` 호출 (cross-chain Topup, DNT-5965/5997).
+/// customer-backend `POST /payments` 호출 (cross-chain Topup).
 ///
 /// source(출금) / destination(수령) 의 chain·token·주소를 직접 입력할 수 있다. 비우면 기본값으로
 /// 폴백(source chain=선택 체인, fromAddress=내 지갑, fromTokenAddress=체인 USDC, destination=source 와 동일).
@@ -27,7 +27,6 @@ class _PaymentSectionState extends State<PaymentSection> {
   final _amountController = TextEditingController();
   // source(출금) / destination(수령) 입력 — 비우면 기본값 폴백(hint 로 기본값 노출).
   final _sourceChainController = TextEditingController();
-  final _fromAddressController = TextEditingController();
   final _fromTokenController = TextEditingController();
   final _destChainController = TextEditingController();
   final _destTokenController = TextEditingController();
@@ -77,7 +76,6 @@ class _PaymentSectionState extends State<PaymentSection> {
     _toController.addListener(_onTextChanged);
     _amountController.addListener(_onTextChanged);
     _sourceChainController.addListener(_onTextChanged);
-    _fromAddressController.addListener(_onTextChanged);
     _fromTokenController.addListener(_onTextChanged);
     _destChainController.addListener(_onTextChanged);
     _destTokenController.addListener(_onTextChanged);
@@ -92,14 +90,12 @@ class _PaymentSectionState extends State<PaymentSection> {
     _toController.removeListener(_onTextChanged);
     _amountController.removeListener(_onTextChanged);
     _sourceChainController.removeListener(_onTextChanged);
-    _fromAddressController.removeListener(_onTextChanged);
     _fromTokenController.removeListener(_onTextChanged);
     _destChainController.removeListener(_onTextChanged);
     _destTokenController.removeListener(_onTextChanged);
     _toController.dispose();
     _amountController.dispose();
     _sourceChainController.dispose();
-    _fromAddressController.dispose();
     _fromTokenController.dispose();
     _destChainController.dispose();
     _destTokenController.dispose();
@@ -187,11 +183,32 @@ class _PaymentSectionState extends State<PaymentSection> {
     widget.wallet.pay(
       sourceChainId: _sourceChainController.text,
       sourceToken: resolvedFromToken,
-      from: _fromAddressController.text,
+      from: '',
       destChainId: _destChainController.text,
       destToken: _destTokenController.text,
       to: _toController.text,
       amount: effectiveAmount,
+    );
+  }
+
+  /// source / destination 을 감싸는 옅은 카드 컨테이너.
+  Widget _groupCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1) const SizedBox(height: 8),
+          ],
+        ],
+      ),
     );
   }
 
@@ -232,8 +249,8 @@ class _PaymentSectionState extends State<PaymentSection> {
     // 입력값이 비면 사용할 기본값 (= 기존 자동 도출 동작). hint 와 확정 전송에 함께 쓴다.
     final resolvedSourceChain =
         _sourceChainController.text.isEmpty ? chainId : _sourceChainController.text;
-    final resolvedFromAddress =
-        _fromAddressController.text.isEmpty ? wallet.address : _fromAddressController.text;
+    // fromAddress 는 항상 현재 선택한 지갑 — 입력받지 않는다.
+    final resolvedFromAddress = wallet.address;
     final resolvedFromToken = _fromTokenController.text.isEmpty
         ? (usdcAddress(resolvedSourceChain) ?? '')
         : _fromTokenController.text;
@@ -284,79 +301,80 @@ class _PaymentSectionState extends State<PaymentSection> {
             ],
           ),
         // ── source (출금) ── chain 은 가져온 목록에서 선택, 나머지는 비우면 hint 의 기본값.
-        Text('source (출금)', style: headerStyle),
-        InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'chain',
-            isDense: true,
-            border: OutlineInputBorder(),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              isExpanded: true,
+        // fromAddress 는 현재 선택한 지갑 고정 — 입력받지 않는다.
+        _groupCard([
+          Text('source (출금)', style: headerStyle),
+          InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'chain',
               isDense: true,
-              value: safeSourceChain,
-              items: [
-                for (final c in wallet.chains)
-                  DropdownMenuItem(
-                      value: c.chainId, child: Text('${c.name} (${c.chainId})')),
-              ],
-              onChanged: (sel) {
-                if (sel == null) return;
-                _sourceChainController.text = sel;
-              },
+              border: OutlineInputBorder(),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                isDense: true,
+                value: safeSourceChain,
+                items: [
+                  for (final c in wallet.chains)
+                    DropdownMenuItem(
+                        value: c.chainId, child: Text('${c.name} (${c.chainId})')),
+                ],
+                onChanged: (sel) {
+                  if (sel == null) return;
+                  _sourceChainController.text = sel;
+                },
+              ),
             ),
           ),
-        ),
-        Field(
-          _fromAddressController,
-          wallet.address.isEmpty ? 'fromAddress (0x…)' : 'fromAddress (기본: 내 지갑)',
-        ),
-        Field(
-          _fromTokenController,
-          'fromTokenAddress (기본: ${usdcAddress(resolvedSourceChain) ?? "0x…"})',
-        ),
+          Field(
+            _fromTokenController,
+            'fromTokenAddress (기본: ${usdcAddress(resolvedSourceChain) ?? "0x…"})',
+          ),
+        ]),
         // ── destination (수령) ── chain/token 비우면 source 와 동일.
-        Text('destination (수령)', style: headerStyle),
-        Row(
-          children: [
-            Expanded(child: Field(_toController, 'to (SETTLEMENT 지갑)')),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () async {
-                final to = await scanRecipient(context);
-                if (!mounted || to == null) return;
-                _toController.text = to;
-              },
-              child: const Text('QR 스캔'),
-            ),
-          ],
-        ),
-        InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'chain',
-            isDense: true,
-            border: OutlineInputBorder(),
+        _groupCard([
+          Text('destination (수령)', style: headerStyle),
+          Row(
+            children: [
+              Expanded(child: Field(_toController, 'toAddress')),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () async {
+                  final to = await scanRecipient(context);
+                  if (!mounted || to == null) return;
+                  _toController.text = to;
+                },
+                child: const Text('QR 스캔'),
+              ),
+            ],
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              isExpanded: true,
+          InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'chain',
               isDense: true,
-              value: safeDestChain,
-              items: [
-                const DropdownMenuItem(value: '', child: Text('source 와 동일')),
-                for (final c in wallet.chains)
-                  DropdownMenuItem(
-                      value: c.chainId, child: Text('${c.name} (${c.chainId})')),
-              ],
-              onChanged: (sel) {
-                if (sel == null) return;
-                _destChainController.text = sel;
-              },
+              border: OutlineInputBorder(),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                isDense: true,
+                value: safeDestChain,
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('source 와 동일')),
+                  for (final c in wallet.chains)
+                    DropdownMenuItem(
+                        value: c.chainId, child: Text('${c.name} (${c.chainId})')),
+                ],
+                onChanged: (sel) {
+                  if (sel == null) return;
+                  _destChainController.text = sel;
+                },
+              ),
             ),
           ),
-        ),
-        Field(_destTokenController, 'tokenAddress (비우면 source 와 동일)'),
+          Field(_destTokenController, 'tokenAddress (비우면 source 와 동일)'),
+        ]),
         // ── 금액 ── destination 과 구분되는 별도 그룹.
         Text('금액', style: headerStyle),
         TextField(
