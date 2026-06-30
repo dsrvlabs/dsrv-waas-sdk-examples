@@ -23,13 +23,38 @@ class PaymentRepository {
   }
 }
 
-/// `POST /payments` request — Topup 결제.
+/// `POST /payments` 의 한쪽 endpoint (출금=source / 수령=destination).
+///
+/// cross-chain (DNT-5965): source 와 destination 이 서로 다른 체인일 수 있어 chain/token/주소를
+/// endpoint 단위로 받는다. 같은 USDC 라도 컨트랙트 주소는 체인마다 달라 [tokenAddress] 도 endpoint 별.
+class PaymentEndpoint {
+  final int chainId;
+  final String tokenAddress;
+
+  /// source = payer(NCW) 주소, destination = 수령자 주소.
+  final String address;
+
+  const PaymentEndpoint({
+    required this.chainId,
+    required this.tokenAddress,
+    required this.address,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'chainId': chainId,
+        'tokenAddress': tokenAddress,
+        'address': address,
+      };
+}
+
+/// `POST /payments` request — Topup 결제 (cross-chain, DNT-5965).
+///
+/// 출금([source]) / 수령([destination]) 을 분리해 보낸다. same-chain 결제는 두 endpoint 의
+/// chainId/tokenAddress 를 동일하게 보내면 된다.
 class PaymentRequest {
   final String sourceUserId;
-  final int chainId;
-  final String token;
-  final String from;
-  final String to;
+  final PaymentEndpoint source;
+  final PaymentEndpoint destination;
 
   /// humanized 문자열 (예: "1.5"). 단위 변환(wei)은 stablecoin Payments 가 담당.
   final String amount;
@@ -39,20 +64,16 @@ class PaymentRequest {
 
   const PaymentRequest({
     required this.sourceUserId,
-    required this.chainId,
-    required this.token,
-    required this.from,
-    required this.to,
+    required this.source,
+    required this.destination,
     required this.amount,
     required this.paymentType,
   });
 
   Map<String, dynamic> toJson() => {
         'sourceUserId': sourceUserId,
-        'chainId': chainId,
-        'token': token,
-        'from': from,
-        'to': to,
+        'source': source.toJson(),
+        'destination': destination.toJson(),
         'amount': amount,
         'paymentType': paymentType,
       };

@@ -2076,6 +2076,51 @@
           },
           {
             "kind": "Var",
+            "name": "deviceId",
+            "printedName": "deviceId",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19dsrv_wallet_sdk_ios10DeviceInfoV8deviceIdSSvp",
+            "mangledName": "$s19dsrv_wallet_sdk_ios10DeviceInfoV8deviceIdSSvp",
+            "moduleName": "dsrv_wallet_sdk_ios",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19dsrv_wallet_sdk_ios10DeviceInfoV8deviceIdSSvg",
+                "mangledName": "$s19dsrv_wallet_sdk_ios10DeviceInfoV8deviceIdSSvg",
+                "moduleName": "dsrv_wallet_sdk_ios",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
             "name": "platform",
             "printedName": "platform",
             "children": [
@@ -2122,7 +2167,7 @@
           {
             "kind": "Constructor",
             "name": "init",
-            "printedName": "init(keyId:publicKey:model:osVersion:isVirtual:attestationObject:)",
+            "printedName": "init(keyId:publicKey:model:osVersion:isVirtual:attestationObject:deviceId:)",
             "children": [
               {
                 "kind": "TypeNominal",
@@ -2192,11 +2237,17 @@
                 ],
                 "hasDefaultArg": true,
                 "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
               }
             ],
             "declKind": "Constructor",
-            "usr": "s:19dsrv_wallet_sdk_ios10DeviceInfoV5keyId9publicKey5model9osVersion9isVirtual17attestationObjectACSSSg_AJS2SSbAJtcfc",
-            "mangledName": "$s19dsrv_wallet_sdk_ios10DeviceInfoV5keyId9publicKey5model9osVersion9isVirtual17attestationObjectACSSSg_AJS2SSbAJtcfc",
+            "usr": "s:19dsrv_wallet_sdk_ios10DeviceInfoV5keyId9publicKey5model9osVersion9isVirtual17attestationObject06deviceH0ACSSSg_AKS2SSbAKSStcfc",
+            "mangledName": "$s19dsrv_wallet_sdk_ios10DeviceInfoV5keyId9publicKey5model9osVersion9isVirtual17attestationObject06deviceH0ACSSSg_AKS2SSbAKSStcfc",
             "moduleName": "dsrv_wallet_sdk_ios",
             "declAttributes": [
               "AccessControl"
@@ -7967,16 +8018,23 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/auth\/DeviceKeyManager.swift",
       "kind": "StringLiteral",
-      "offset": 599,
+      "offset": 640,
       "length": 32,
       "value": "\"com.dsrv.wallet.sdk.device-key\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/auth\/DeviceKeyManager.swift",
       "kind": "StringLiteral",
-      "offset": 672,
+      "offset": 713,
       "length": 35,
       "value": "\"com.dsrv.wallet.sdk.attest-key-id\""
+    },
+    {
+      "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/auth\/DeviceKeyManager.swift",
+      "kind": "StringLiteral",
+      "offset": 786,
+      "length": 31,
+      "value": "\"com.dsrv.wallet.sdk.device-id\""
     },
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/internal\/auth\/TokenManager.swift",
@@ -8492,7 +8550,7 @@
     {
       "filePath": "\/Users\/lt-151\/Desktop\/source\/dsrv\/dsrv-wallet-sdk-monorepo\/ios\/dsrv-wallet-sdk-ios\/dsrv-wallet-sdk-ios\/Handlers.swift",
       "kind": "StringLiteral",
-      "offset": 717,
+      "offset": 912,
       "length": 5,
       "value": "\"IOS\""
     },

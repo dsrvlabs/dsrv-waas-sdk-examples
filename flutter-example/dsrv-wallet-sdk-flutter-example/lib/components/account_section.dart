@@ -87,7 +87,6 @@ class AccountSection extends StatelessWidget {
               for (final addr in wallet.accounts[i].addresses)
                 _WalletRow(
                   address: addr,
-                  setupStatus: wallet.addressSetupStatusMap[addr.addressId],
                   selected: addr.address.toLowerCase() ==
                       wallet.address.toLowerCase(),
                   onTap: () {
@@ -183,12 +182,10 @@ class _AccountHeader extends StatelessWidget {
 
 class _WalletRow extends StatelessWidget {
   final AddressInfo address;
-  final List<ChainSetupStatus>? setupStatus;
   final bool selected;
   final VoidCallback onTap;
   const _WalletRow({
     required this.address,
-    required this.setupStatus,
     required this.selected,
     required this.onTap,
   });
@@ -222,11 +219,6 @@ class _WalletRow extends StatelessWidget {
                   if (label != null && label.isNotEmpty)
                     Text(label,
                         style: TextStyle(fontSize: 11, color: hint)),
-                  if (setupStatus != null && setupStatus!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: _SetupStatusChips(setupStatus: setupStatus!),
-                    ),
                 ],
               ),
             ),
@@ -239,48 +231,3 @@ class _WalletRow extends StatelessWidget {
 
 String _shortId(String id) =>
     id.length <= 12 ? id : '${id.substring(0, 8)}…${id.substring(id.length - 4)}';
-
-/// getAccountList 가 반환한 주소별 setupStatus snapshot 을 위임·승인 요약 칩으로 표시.
-class _SetupStatusChips extends StatelessWidget {
-  final List<ChainSetupStatus> setupStatus;
-  const _SetupStatusChips({required this.setupStatus});
-
-  @override
-  Widget build(BuildContext context) {
-    final total = setupStatus.length;
-    final delegated = setupStatus.where((c) => c.delegated).length;
-    final approved =
-        setupStatus.where((c) => c.approvals.any((t) => t.approved)).length;
-    return Wrap(
-      spacing: 4,
-      runSpacing: 2,
-      children: [
-        _MiniBadge(label: '위임 $delegated/$total', active: delegated > 0),
-        _MiniBadge(label: '승인 $approved/$total', active: approved > 0),
-      ],
-    );
-  }
-}
-
-class _MiniBadge extends StatelessWidget {
-  final String label;
-  final bool active;
-  const _MiniBadge({required this.label, required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).hintColor;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 10, color: color, fontWeight: FontWeight.w600)),
-    );
-  }
-}

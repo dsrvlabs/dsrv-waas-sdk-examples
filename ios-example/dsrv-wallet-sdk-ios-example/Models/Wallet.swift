@@ -72,9 +72,6 @@ struct WalletUiState {
     var setupStatusLoading: Bool = false
     var setupStatusError: String? = nil
     var setupStatus: [ChainSetupStatus] = []
-    /// wallet list 화면의 위임/승인 chip 표시용 — addressId → ChainSetupStatus 목록.
-    /// getAccountList 직후 batch fetch 로 채워짐 (N 회 getSetupStatus 호출).
-    var addressSetupStatusMap: [String: [ChainSetupStatus]] = [:]
 
     // Payment (customer-backend POST /payments — TOPUP)
     var paymentLoading: Bool = false
@@ -125,10 +122,6 @@ final class Wallet: ObservableObject {
     /// 진행 중인 init Task — 사용자 전환 / reset 시 cancel 해 stale 결과가 새 state 를 덮어쓰는 것 방지.
     private var initTask: Task<Void, Never>?
 
-    /// 진행 중인 setupStatus batch fetch Task — 빠른 계정 전환 / 재호출 시 cancel 해 stale batch
-    /// 결과가 최신 getAccountList 의 `addressSetupStatusMap` 을 덮어쓰는 것 방지.
-    private var setupStatusTask: Task<Void, Never>?
-
     init() {
         userId = prefs.string(forKey: Self.keyUserId) ?? ""
     }
@@ -176,7 +169,6 @@ final class Wallet: ObservableObject {
 
         if uiState.sdkInitialized || uiState.sdkInitializing {
             initTask?.cancel()
-            setupStatusTask?.cancel()
             Task { await DSRVWallet.reset() }
             publicKey = ""
             address = ""
@@ -191,7 +183,6 @@ final class Wallet: ObservableObject {
 
     func resetWallet() {
         initTask?.cancel()
-        setupStatusTask?.cancel()
         if uiState.sdkInitialized {
             Task { await DSRVWallet.reset() }
         }
@@ -318,44 +309,10 @@ final class Wallet: ObservableObject {
                 for acc in list {
                     addLog("  accountId=\(acc.accountId), label=\(acc.label), addresses=\(acc.addresses.count)")
                 }
-                // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
-                fetchAllSetupStatuses(accounts: list)
             case .failure(let error):
                 uiState.accountsError = error.description
                 addLog("✗ getAccountList FAILED: \(error.description)")
             }
-        }
-    }
-
-    /// 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [addressSetupStatusMap] 채움.
-    /// `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출.
-    private func fetchAllSetupStatuses(accounts: [AccountInfo]) {
-        // 이전 batch fetch 가 진행 중이면 cancel — stale 결과가 새 호출의 map 을 덮어쓰지 못하도록.
-        setupStatusTask?.cancel()
-        // main actor isolated closure 가 group.addTask 의 sending 인자로 가능하도록 String 만 캡쳐.
-        let targets: [(accountId: String, addressId: String)] = accounts.flatMap { acc in
-            acc.addresses.map { (acc.accountId, $0.addressId) }
-        }
-        setupStatusTask = Task {
-            var collected: [String: [ChainSetupStatus]] = [:]
-            await withTaskGroup(of: (String, [ChainSetupStatus])?.self) { group in
-                for target in targets {
-                    let accountId = target.accountId
-                    let addressId = target.addressId
-                    group.addTask {
-                        let r = await DSRVWallet.getSetupStatus(accountId: accountId, addressId: addressId)
-                        if case .success(let list) = r { return (addressId, list) }
-                        return nil
-                    }
-                }
-                for await pair in group {
-                    if let (id, list) = pair { collected[id] = list }
-                }
-            }
-            // 새 batch 가 이미 진행 중이라면 stale 결과 반영 skip.
-            if Task.isCancelled { return }
-            uiState.addressSetupStatusMap = collected
-            addLog("⚙ setupStatus batch fetched (\(collected.count)/\(targets.count))")
         }
     }
 
@@ -1056,9 +1013,11 @@ final class Wallet: ObservableObject {
     ///   paymentType  → 0
     func pay(
         sourceUserIdInput: String = "",
-        chainIdInput: String = "",
-        tokenInput: String = "",
+        sourceChainIdInput: String = "",
+        sourceTokenInput: String = "",
         fromInput: String = "",
+        destChainIdInput: String = "",
+        destTokenInput: String = "",
         toInput: String,
         amountInput: String,
         paymentTypeInput: String = ""
@@ -1069,7 +1028,7 @@ final class Wallet: ObservableObject {
         }
         let from = fromInput.isEmpty ? address : fromInput
         if from.isEmpty {
-            uiState.paymentError = "from 주소가 필요합니다 (create 먼저 실행)"
+            uiState.paymentError = "fromAddress 가 필요합니다 (create 먼저 실행)"
             return
         }
         if toInput.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -1086,27 +1045,41 @@ final class Wallet: ObservableObject {
             uiState.paymentError = "sourceUserId 가 필요합니다"
             return
         }
-        let chainIdStr = chainIdInput.isEmpty
+        let sourceChainStr = sourceChainIdInput.isEmpty
             ? (uiState.selectedChainId ?? demoChainIdFallback)
-            : chainIdInput
-        guard let chainIdInt = Int(chainIdStr) else {
-            uiState.paymentError = "chainId 정수 변환 실패: \(chainIdStr)"
+            : sourceChainIdInput
+        guard let sourceChainId = Int(sourceChainStr) else {
+            uiState.paymentError = "source chainId 정수 변환 실패: \(sourceChainStr)"
             return
         }
-        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
-        let token = tokenInput
-        if token.isEmpty {
-            uiState.paymentError = "token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)"
+        // source token = 출금 자산의 컨트랙트 주소 — PaymentSection 이 입력/기본값(USDC)을 전달한다.
+        let sourceToken = sourceTokenInput
+        if sourceToken.isEmpty {
+            uiState.paymentError = "fromTokenAddress(컨트랙트 주소)가 필요합니다"
             return
         }
+        // destination 은 비우면 source 와 동일 체인/토큰 사용 (same-chain 결제).
+        let destChainId: Int
+        if destChainIdInput.isEmpty {
+            destChainId = sourceChainId
+        } else {
+            guard let parsed = Int(destChainIdInput) else {
+                uiState.paymentError = "destination chainId 정수 변환 실패: \(destChainIdInput)"
+                return
+            }
+            destChainId = parsed
+        }
+        let destToken = destTokenInput.isEmpty ? sourceToken : destTokenInput
         let paymentType = Int(paymentTypeInput) ?? 0
 
         let request = PaymentRequest(
             sourceUserId: sourceUserId,
-            chainId: chainIdInt,
-            token: token,
-            from: from,
-            to: toInput.trimmingCharacters(in: .whitespaces),
+            source: PaymentEndpoint(chainId: sourceChainId, tokenAddress: sourceToken, address: from),
+            destination: PaymentEndpoint(
+                chainId: destChainId,
+                tokenAddress: destToken,
+                address: toInput.trimmingCharacters(in: .whitespaces)
+            ),
             amount: amountInput.trimmingCharacters(in: .whitespaces),
             paymentType: paymentType
         )
@@ -1114,7 +1087,7 @@ final class Wallet: ObservableObject {
         uiState.paymentLoading = true
         uiState.paymentError = nil
         uiState.paymentResult = nil
-        addLog("▶ pay(chainId=\(chainIdInt), from=\(from.prefix(10))…, to=\(request.to.prefix(10))…, amount=\(request.amount))")
+        addLog("▶ pay(source=\(sourceChainId)/\(from.prefix(10))…, dest=\(destChainId)/\(request.destination.address.prefix(10))…, amount=\(request.amount))")
 
         let repo = PaymentRepository(backendUrl: customerBackendUrl)
         Task {

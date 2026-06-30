@@ -19,13 +19,33 @@ struct PaymentRepository {
     }
 }
 
-/// `POST /payments` request — Topup 결제.
+/// `POST /payments` 의 한쪽 endpoint (출금=source / 수령=destination).
+///
+/// cross-chain (DNT-5965): source 와 destination 이 서로 다른 체인일 수 있어 chain/token/주소를
+/// endpoint 단위로 받는다. 같은 USDC 라도 컨트랙트 주소는 체인마다 달라 `tokenAddress` 도 endpoint 별.
+struct PaymentEndpoint {
+    let chainId: Int
+    let tokenAddress: String
+    /// source = payer(NCW) 주소, destination = 수령자 주소.
+    let address: String
+
+    func toJson() -> [String: Any] {
+        [
+            "chainId": chainId,
+            "tokenAddress": tokenAddress,
+            "address": address,
+        ]
+    }
+}
+
+/// `POST /payments` request — Topup 결제 (cross-chain, DNT-5965).
+///
+/// 출금(`source`) / 수령(`destination`) 을 분리해 보낸다. same-chain 결제는 두 endpoint 의
+/// chainId/tokenAddress 를 동일하게 보내면 된다.
 struct PaymentRequest {
     let sourceUserId: String
-    let chainId: Int
-    let token: String
-    let from: String
-    let to: String
+    let source: PaymentEndpoint
+    let destination: PaymentEndpoint
     /// humanized 문자열 (예: "1.5"). 단위 변환(wei)은 stablecoin Payments 가 담당.
     let amount: String
     /// onchainPaymentType — 0 = 일반 결제.
@@ -34,10 +54,8 @@ struct PaymentRequest {
     func toJsonBody() -> [String: Any] {
         [
             "sourceUserId": sourceUserId,
-            "chainId": chainId,
-            "token": token,
-            "from": from,
-            "to": to,
+            "source": source.toJson(),
+            "destination": destination.toJson(),
             "amount": amount,
             "paymentType": paymentType,
         ]

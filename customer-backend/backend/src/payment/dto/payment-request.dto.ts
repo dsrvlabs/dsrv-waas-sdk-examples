@@ -1,4 +1,43 @@
-import { IsInt, IsNotEmpty, IsString, Matches, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+/**
+ * 결제 endpoint (출금/수령) 한쪽 — cross-chain TOPUP 에서 source 와 destination 이
+ * 서로 다른 체인일 수 있으므로 chain / token / 주소를 endpoint 단위로 받는다.
+ *
+ * <p><b>token 이 체인별로 다른 이유</b>: 같은 USDC 라도 컨트랙트 주소는 체인마다 다르다
+ * (예: base-sepolia USDC ≠ ethereum-sepolia USDC). 따라서 단일 token 으로는 cross-chain
+ * 을 표현할 수 없어 endpoint 마다 tokenAddress 를 받는다.
+ */
+export class PaymentEndpointDto {
+  /** EVM chain id (예: 84532 = base-sepolia, 11155111 = ethereum-sepolia). */
+  @IsInt()
+  @Min(1, { message: 'chainId must be positive' })
+  chainId!: number;
+
+  /** 해당 체인의 ERC-20 토큰 컨트랙트 주소. */
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^0x[a-fA-F0-9]{40}$/, {
+    message: 'tokenAddress must be EVM 0x-prefixed 40 hex',
+  })
+  tokenAddress!: string;
+
+  /** source = payer(NCW) 주소, destination = 수령자 주소. */
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^0x[a-fA-F0-9]{40}$/, {
+    message: 'address must be EVM 0x-prefixed 40 hex',
+  })
+  address!: string;
+}
 
 /**
  * Topup 결제 요청 (RN 앱 → customer-backend).
@@ -6,6 +45,9 @@ import { IsInt, IsNotEmpty, IsString, Matches, Min } from 'class-validator';
  * <p>{@code POST /payments} 단일 엔드포인트의 입력. customer-backend 가 내부에서
  * quote → paymentDigest 서명(고객사 PK) → execute 를 순차 처리하므로,
  * 클라이언트는 더 이상 서명/quote 결과를 첨부하지 않는다.
+ *
+ * <p><b>cross-chain (DNT-5965)</b>: source(출금) / destination(수령) 을 분리해 받는다.
+ * same-chain 결제는 source 와 destination 의 chainId 를 동일하게 보내면 된다.
  */
 export class PaymentRequestDto {
   /**
@@ -17,32 +59,15 @@ export class PaymentRequestDto {
   @IsNotEmpty()
   sourceUserId!: string;
 
-  @IsInt()
-  @Min(1, { message: 'chainId must be positive' })
-  chainId!: number;
+  /** 출금 — payer 가 결제하는 체인 + token + NCW 주소. paymentDigest 가 이 체인에 종속. */
+  @ValidateNested()
+  @Type(() => PaymentEndpointDto)
+  source!: PaymentEndpointDto;
 
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^0x[a-fA-F0-9]{40}$/, {
-    message: 'token must be EVM 0x-prefixed 40 hex',
-  })
-  token!: string;
-
-  /** 사용자 NCW (smart account) 주소 — quote 의 payer 로 매핑. */
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^0x[a-fA-F0-9]{40}$/, {
-    message: 'from must be EVM 0x-prefixed 40 hex',
-  })
-  from!: string;
-
-  /** 수령자 — 보통 프로젝트 SETTLEMENT 지갑. */
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^0x[a-fA-F0-9]{40}$/, {
-    message: 'to must be EVM 0x-prefixed 40 hex',
-  })
-  to!: string;
+  /** 수령 — 수령 체인 + token + 수령자 주소 (보통 프로젝트 SETTLEMENT 지갑). */
+  @ValidateNested()
+  @Type(() => PaymentEndpointDto)
+  destination!: PaymentEndpointDto;
 
   /**
    * 결제 금액 — humanized BigDecimal 문자열 (예: "1.5" = 1.5 USDC, "0.0994" = 0.0994 USDC).

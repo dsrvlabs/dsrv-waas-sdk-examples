@@ -44,6 +44,11 @@ export class DeviceInfoDto {
   @IsString()
   @IsOptional()
   attestationObject?: string;
+
+  // Stable per-device id (survives reinstall) used by the backend to dedup reinstalls.
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class AuthenticateDto {

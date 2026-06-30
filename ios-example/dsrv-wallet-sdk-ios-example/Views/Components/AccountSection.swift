@@ -111,9 +111,6 @@ struct AccountSection: View {
                     if let label = addr.label, !label.isEmpty {
                         Text(label).font(.caption).foregroundStyle(.secondary)
                     }
-                    if let setupStatus = wallet.uiState.addressSetupStatusMap[addr.addressId], !setupStatus.isEmpty {
-                        setupStatusChips(setupStatus)
-                    }
                 }
                 Spacer()
             }
@@ -121,28 +118,6 @@ struct AccountSection: View {
             .padding(.leading, 8)
         }
         .buttonStyle(.plain)
-    }
-
-    /// Wallet 의 `addressSetupStatusMap` (batch fetched) 으로부터 받은 위임·승인 요약 칩 표시.
-    @ViewBuilder
-    private func setupStatusChips(_ setupStatus: [ChainSetupStatus]) -> some View {
-        let total = setupStatus.count
-        let delegated = setupStatus.filter { $0.delegated }.count
-        let approved = setupStatus.filter { chain in chain.approvals.contains { $0.approved } }.count
-        HStack(spacing: 4) {
-            statusBadge("위임 \(delegated)/\(total)", active: delegated > 0)
-            statusBadge("승인 \(approved)/\(total)", active: approved > 0)
-        }
-    }
-
-    private func statusBadge(_ text: String, active: Bool) -> some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
-            .foregroundColor(active ? .accentColor : .secondary)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func shortId(_ id: String) -> String {

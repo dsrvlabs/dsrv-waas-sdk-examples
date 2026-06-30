@@ -43,7 +43,6 @@ class WalletState extends ChangeNotifier {
 
     if (initialized || initializing) {
       _initGeneration++;
-      _setupStatusGeneration++;
       await DSRVWallet.reset();
       publicKey = '';
       address = '';
@@ -68,7 +67,6 @@ class WalletState extends ChangeNotifier {
       approveError = null;
       setupStatus = [];
       setupStatusError = null;
-      addressSetupStatusMap = {};
       selectedAddressId = null;
       paymentResult = null;
       paymentError = null;
@@ -88,7 +86,6 @@ class WalletState extends ChangeNotifier {
 
   Future<void> resetWallet() async {
     _initGeneration++;
-    _setupStatusGeneration++;
     if (initialized) {
       await DSRVWallet.reset();
     }
@@ -113,7 +110,6 @@ class WalletState extends ChangeNotifier {
     approveError = null;
     setupStatus = [];
     setupStatusError = null;
-    addressSetupStatusMap = {};
     selectedAddressId = null;
     paymentResult = null;
     paymentError = null;
@@ -152,11 +148,8 @@ class WalletState extends ChangeNotifier {
   List<ChainTxResult> revokeResults = [];
   List<ChainTxResult> approveResults = [];
   String? approveError;
-  // chain 별 위임/승인 상태 snapshot (getSetupStatus / getAccountList).
+  // chain 별 위임/승인 상태 snapshot (getSetupStatus).
   List<ChainSetupStatus> setupStatus = [];
-  /// wallet list 화면의 위임/승인 chip 표시용 — addressId → ChainSetupStatus 목록.
-  /// getAccountList 직후 batch fetch 로 채워짐 (N 회 getSetupStatus 호출).
-  Map<String, List<ChainSetupStatus>> addressSetupStatusMap = {};
   String? setupStatusError;
   PaymentResponse? paymentResult;
   String? paymentError;
@@ -264,36 +257,8 @@ class WalletState extends ChangeNotifier {
             selectedAccountId = list.isEmpty ? null : list.last.accountId;
           }
           _log('✓ accounts=${list.length} (selected=${selectedAccountId ?? "none"})');
-          // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
-          _fetchAllSetupStatuses(list);
         }, (e) => _log('✗ ${e.message}'));
       });
-
-  /// 진행 중인 setupStatus batch fetch 의 generation token — Dart Future 는 cancel 안 되므로
-  /// 결과 적용 단계에서 비교해 stale batch 가 새 호출의 map 을 덮어쓰는 것 방지.
-  int _setupStatusGeneration = 0;
-
-  /// 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [addressSetupStatusMap] 채움.
-  /// `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출.
-  Future<void> _fetchAllSetupStatuses(List<AccountInfo> accs) async {
-    final gen = ++_setupStatusGeneration;
-    final targets = [
-      for (final a in accs)
-        for (final addr in a.addresses) (a.accountId, addr.addressId),
-    ];
-    final results = await Future.wait(targets.map((t) async {
-      final r = await DSRVWallet.getSetupStatus(
-          accountId: t.$1, addressId: t.$2);
-      return r.fold((list) => MapEntry(t.$2, list), (_) => null);
-    }));
-    // 새 batch 가 이미 진행 중이면 stale 결과 반영 skip.
-    if (gen != _setupStatusGeneration) return;
-    addressSetupStatusMap = {
-      for (final e in results.whereType<MapEntry<String, List<ChainSetupStatus>>>()) e.key: e.value,
-    };
-    _log('⚙ setupStatus batch fetched (${addressSetupStatusMap.length}/${targets.length})');
-    notifyListeners();
-  }
 
   void selectAccount(String accountId) {
     selectedAccountId = accountId;
@@ -308,11 +273,9 @@ class WalletState extends ChangeNotifier {
     address = acc.isEmpty ? normalized : acc.first.address.toLowerCase();
     publicKey = acc.isEmpty ? '' : acc.first.publicKey;
     selectedAddressId = acc.isEmpty ? null : acc.first.addressId;
-    // 선택된 지갑이 바뀌면 이전 setup status snapshot 은 무효 — batch fetch 한 map 에 있으면
-    // 그것으로 채우고, 없으면 비운다. (단건 fresh fetch 는 SetupStatusSection 진입 시 자동 트리거.)
-    setupStatus = acc.isEmpty
-        ? []
-        : (addressSetupStatusMap[acc.first.addressId] ?? []);
+    // 선택된 지갑이 바뀌면 이전 setup status snapshot 은 무효 — 비운다.
+    // (fresh fetch 는 SetupStatusSection 진입 시 자동 트리거.)
+    setupStatus = [];
     notifyListeners();
   }
 
@@ -830,8 +793,11 @@ class WalletState extends ChangeNotifier {
   /// WaaS 가 topup wallet 등록 시 external_user_ref 로 박는 값과 일치), chainId=selectedChainId,
   /// from=address, paymentType=0. [token] (컨트랙트 주소)은 PaymentSection 이 선택 자산에서 전달 — 필수.
   Future<void> pay({
-    String chainId = '',
-    String token = '',
+    String sourceChainId = '',
+    String sourceToken = '',
+    String from = '',
+    String destChainId = '',
+    String destToken = '',
     required String to,
     required String amount,
   }) =>
@@ -848,35 +814,56 @@ class WalletState extends ChangeNotifier {
           paymentError = 'amount (예: 1.5) 를 입력하세요';
           return;
         }
+        final fromAddr = from.isEmpty ? address : from;
 
-        final c = chainId.isEmpty ? (selectedChainId ?? '') : chainId;
-        if (c.isEmpty) {
-          paymentError = 'chain 을 먼저 선택하세요';
+        final sc = sourceChainId.isEmpty ? (selectedChainId ?? '') : sourceChainId;
+        if (sc.isEmpty) {
+          paymentError = 'source chain 을 먼저 선택하세요';
           return;
         }
-        final chainIdInt = int.tryParse(c);
-        if (chainIdInt == null) {
-          paymentError = 'chainId 정수 변환 실패: $c';
+        final sourceChainInt = int.tryParse(sc);
+        if (sourceChainInt == null) {
+          paymentError = 'source chainId 정수 변환 실패: $sc';
           return;
         }
-        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
-        if (token.isEmpty) {
-          paymentError = 'token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)';
+        // source token = 출금 자산의 컨트랙트 주소 — PaymentSection 이 입력/기본값(USDC)을 전달한다.
+        if (sourceToken.isEmpty) {
+          paymentError = 'fromTokenAddress(컨트랙트 주소)가 필요합니다';
           return;
         }
-        final resolvedToken = token;
+        // destination 은 비우면 source 와 동일 체인/토큰 사용 (same-chain 결제).
+        final int destChainInt;
+        if (destChainId.isEmpty) {
+          destChainInt = sourceChainInt;
+        } else {
+          final parsed = int.tryParse(destChainId);
+          if (parsed == null) {
+            paymentError = 'destination chainId 정수 변환 실패: $destChainId';
+            return;
+          }
+          destChainInt = parsed;
+        }
+        final resolvedDestToken = destToken.isEmpty ? sourceToken : destToken;
 
         paymentResult = null;
         paymentError = null;
-        _log('▶ pay(chainId=$chainIdInt, from=${address.substring(0, 10)}…, to=${to.substring(0, 10)}…, amount=$amount)');
+        final fromHead = fromAddr.length > 10 ? fromAddr.substring(0, 10) : fromAddr;
+        final toHead = to.length > 10 ? to.substring(0, 10) : to;
+        _log('▶ pay(source=$sourceChainInt/$fromHead…, dest=$destChainInt/$toHead…, amount=$amount)');
         try {
           paymentResult = await _paymentRepo.pay(PaymentRequest(
             // raw userId 가 아닌 userUuid (UUID v3 derive) — wallet_topup.external_user_ref 와 일치.
             sourceUserId: userUuid,
-            chainId: chainIdInt,
-            token: resolvedToken,
-            from: address,
-            to: to.trim(),
+            source: PaymentEndpoint(
+              chainId: sourceChainInt,
+              tokenAddress: sourceToken,
+              address: fromAddr,
+            ),
+            destination: PaymentEndpoint(
+              chainId: destChainInt,
+              tokenAddress: resolvedDestToken,
+              address: to.trim(),
+            ),
             amount: amount.trim(),
             paymentType: 0,
           ));

@@ -35,7 +35,8 @@ class MyAuthHandler: AuthHandler {
                     "model": request.deviceInfo.model,
                     "osVersion": request.deviceInfo.osVersion,
                     "isVirtual": request.deviceInfo.isVirtual,
-                    "attestationObject": request.deviceInfo.attestationObject as Any
+                    "attestationObject": request.deviceInfo.attestationObject as Any,
+                    "deviceId": request.deviceInfo.deviceId
                 ]
             ]
 

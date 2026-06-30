@@ -98,10 +98,9 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         val trimmed = newUserId.trim()
         if (trimmed.isEmpty() || trimmed == userId) return
 
-        // 다른 사용자 전환: 진행 중 init / setupStatus batch job cancel → SDK reset → 다음 initialize().
+        // 다른 사용자 전환: 진행 중 init job cancel → SDK reset → 다음 initialize().
         if (uiState.sdkInitialized || uiState.sdkInitializing) {
             initJob?.cancel()
-            setupStatusJob?.cancel()
             DSRVWallet.reset()
             publicKey = ""
             address = ""
@@ -130,12 +129,6 @@ class Wallet(application: Application) : AndroidViewModel(application) {
      * 진행 중인 init coroutine — 사용자 전환 / reset 시 cancel 해 stale 결과가 새 state 를 덮어쓰는 것 방지.
      */
     private var initJob: Job? = null
-
-    /**
-     * 진행 중인 setupStatus batch fetch job — 빠른 계정 전환 / 재호출 시 cancel 해 stale batch 결과가
-     * 최신 getAccountList 의 [WalletUiState.addressSetupStatusMap] 을 덮어쓰는 것 방지.
-     */
-    private var setupStatusJob: Job? = null
 
     private fun initializeSdk() {
         addLog("▶ initialize")
@@ -207,7 +200,6 @@ class Wallet(application: Application) : AndroidViewModel(application) {
 
     fun resetWallet() {
         initJob?.cancel()
-        setupStatusJob?.cancel()
         if (uiState.sdkInitialized) DSRVWallet.reset()
         publicKey = ""
         address = ""
@@ -262,44 +254,11 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     uiState = uiState.copy(accounts = list, selectedAccountId = selected)
                     addLog("✓ getAccountList count=${list.size} (selected=${selected ?: "none"})")
                     list.forEach { addLog("  accountId=${it.accountId}, label=${it.label}, addresses=${it.addresses.size}") }
-                    // chip 표시용 — 모든 address 의 setupStatus 를 parallel batch fetch.
-                    fetchAllSetupStatuses(list)
                 } else {
                     val error = result.errorOrNull()
                     uiState = uiState.copy(accountsError = error?.message)
                     addLog("✗ getAccountList FAILED: ${error?.message}")
                 }
-            }
-        }
-    }
-
-    /**
-     * 모든 wallet 의 위임/승인 상태를 parallel 로 fetch 해 [WalletUiState.addressSetupStatusMap] 채움.
-     * `AddressInfo.setupStatus` 가 SDK 에서 제거되면서 wallet list chip 표시용으로 단건 N 회 호출
-     * 추가 — wallet 수가 많을 때 (10+) slow 할 수 있으므로 향후 lazy / virtualized 호출 검토 여지.
-     */
-    private fun fetchAllSetupStatuses(accounts: List<com.dsrv.wallet.sdk.AccountInfo>) {
-        // 이전 batch fetch 가 진행 중이면 cancel — stale 결과가 새 호출의 map 을 덮어쓰지 못하도록.
-        setupStatusJob?.cancel()
-        setupStatusJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val pairs: List<Pair<String, List<com.dsrv.wallet.sdk.ChainSetupStatus>>> = coroutineScope {
-                    accounts.flatMap { acc ->
-                        acc.addresses.map { addr ->
-                            async<Pair<String, List<com.dsrv.wallet.sdk.ChainSetupStatus>>?> {
-                                val r = DSRVWallet.getSetupStatus(acc.accountId, addr.addressId)
-                                if (r.isSuccess) addr.addressId to (r.getOrNull() ?: emptyList()) else null
-                            }
-                        }
-                    }.awaitAll().filterNotNull()
-                }
-                withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(addressSetupStatusMap = pairs.toMap())
-                    addLog("⚙ setupStatus batch fetched (${pairs.size}/${accounts.sumOf { it.addresses.size }})")
-                }
-            } catch (t: CancellationException) {
-                // 새 batch 가 이미 진행 중이므로 stale 결과 반영 skip.
-                throw t
             }
         }
     }
@@ -1014,9 +973,11 @@ class Wallet(application: Application) : AndroidViewModel(application) {
      */
     fun pay(
         sourceUserIdInput: String = "",
-        chainIdInput: String = "",
-        tokenInput: String = "",
+        sourceChainIdInput: String = "",
+        sourceTokenInput: String = "",
         fromInput: String = "",
+        destChainIdInput: String = "",
+        destTokenInput: String = "",
         toInput: String,
         amountInput: String,
         paymentTypeInput: String = "",
@@ -1027,7 +988,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
         }
         val from = fromInput.takeIf { it.isNotBlank() } ?: address
         if (from.isEmpty()) {
-            uiState = uiState.copy(paymentError = "from 주소가 필요합니다 (create 먼저 실행)")
+            uiState = uiState.copy(paymentError = "fromAddress 가 필요합니다 (create 먼저 실행)")
             return
         }
         if (toInput.isBlank()) {
@@ -1043,32 +1004,38 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(paymentError = "sourceUserId 가 필요합니다 (userId 입력 후 init)")
             return
         }
-        val chainIdStr = chainIdInput.takeIf { it.isNotBlank() }
+        val sourceChainStr = sourceChainIdInput.takeIf { it.isNotBlank() }
             ?: uiState.selectedChainId
             ?: DEMO_CHAIN_ID_FALLBACK
-        val chainId = chainIdStr.toIntOrNull() ?: run {
-            uiState = uiState.copy(paymentError = "chainId 정수 변환 실패: $chainIdStr")
+        val sourceChainId = sourceChainStr.toIntOrNull() ?: run {
+            uiState = uiState.copy(paymentError = "source chainId 정수 변환 실패: $sourceChainStr")
             return
         }
-        // token 은 결제할 자산의 컨트랙트 주소 — PaymentSection 이 선택 자산에서 직접 전달한다.
-        val token = tokenInput.takeIf { it.isNotBlank() } ?: run {
-            uiState = uiState.copy(paymentError = "token(컨트랙트 주소)이 필요합니다 (자산을 먼저 선택하세요)")
+        // source token = 출금 자산의 컨트랙트 주소 — PaymentSection 이 입력/기본값(USDC)을 전달한다.
+        val sourceToken = sourceTokenInput.takeIf { it.isNotBlank() } ?: run {
+            uiState = uiState.copy(paymentError = "fromTokenAddress(컨트랙트 주소)가 필요합니다")
             return
         }
+        // destination 은 비우면 source 와 동일 체인/토큰 사용 (same-chain 결제).
+        val destChainId = if (destChainIdInput.isBlank()) sourceChainId else {
+            destChainIdInput.toIntOrNull() ?: run {
+                uiState = uiState.copy(paymentError = "destination chainId 정수 변환 실패: $destChainIdInput")
+                return
+            }
+        }
+        val destToken = destTokenInput.takeIf { it.isNotBlank() } ?: sourceToken
         val paymentType = paymentTypeInput.takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
 
         val request = PaymentRequest(
             sourceUserId = sourceUserId,
-            chainId = chainId,
-            token = token,
-            from = from,
-            to = toInput.trim(),
+            source = PaymentEndpoint(chainId = sourceChainId, tokenAddress = sourceToken, address = from),
+            destination = PaymentEndpoint(chainId = destChainId, tokenAddress = destToken, address = toInput.trim()),
             amount = amountInput.trim(),
             paymentType = paymentType,
         )
 
         uiState = uiState.copy(paymentLoading = true, paymentError = null, paymentResult = null)
-        addLog("▶ pay(chainId=$chainId, from=${from.take(10)}…, to=${request.to.take(10)}…, amount=${request.amount})")
+        addLog("▶ pay(source=$sourceChainId/${from.take(10)}…, dest=$destChainId/${request.destination.address.take(10)}…, amount=${request.amount})")
 
         viewModelScope.launch(Dispatchers.IO) {
             try {

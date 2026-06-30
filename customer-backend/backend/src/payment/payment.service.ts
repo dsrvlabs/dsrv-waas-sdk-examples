@@ -81,13 +81,16 @@ export class PaymentService {
   /** Step 1 — Payments quote 호출, paymentDigest + params 수신. */
   private async quote(request: PaymentRequestDto): Promise<QuoteResponseDto> {
     try {
+      // quote 는 단순 shape 유지 (stablecoin CreateQuoteRequest 정합) — cross-chain 분해는
+      // execute 에서 처리한다. quote 는 source 체인에서 paymentDigest 를 발급하므로 source 기준:
+      //   chainId/token/payer = source, to = destination 수령 주소.
       const response = await axios.post(
         `${this.dsrvApiBaseUrl}/payments/api/transactions/quote`,
         {
-          chainId: request.chainId,
-          token: request.token,
-          payer: request.from,
-          to: request.to,
+          chainId: request.source.chainId,
+          token: request.source.tokenAddress,
+          payer: request.source.address,
+          to: request.destination.address,
           amount: request.amount,
           paymentType: request.paymentType,
         },
@@ -113,7 +116,7 @@ export class PaymentService {
         );
       }
       this.logger.log(
-        `payments.quote:ok payer=${request.from} amountHumanized=${request.amount} paymentUuid=${data.params.paymentUuid} deadline=${data.params.deadline}`,
+        `payments.quote:ok payer=${request.source.address} amountHumanized=${request.amount} paymentUuid=${data.params.paymentUuid} deadline=${data.params.deadline}`,
       );
       return data;
     } catch (error) {
@@ -143,28 +146,29 @@ export class PaymentService {
       const params = quote.params;
       // Payments stablecoin transaction create — TOPUP 분기는 paymentType=TOPUP 으로 트리거.
       //
+      // cross-chain (DNT-5965): source/destination 를 체인 단위로 분해 — paymentRail 대신
+      // chainId, currency 대신 token (USDC 컨트랙트 주소가 체인별로 다름).
       // stablecoin 측이 quote 시점에 발급한 값을 그대로 echo:
       //   - onchainPayment.{paymentUuid, deadline, customerEpoch}: trade authoritative metadata
       //   - feeAllocations(Hash): 컨트랙트 keccak 검증 대상 — quote raw BigInteger 그대로 forward
-      // chainId 는 on-chain 메타데이터의 일부로 onchainPayment 그룹 안에 위치 (stablecoin DTO 정합).
-      // CreateTransactionRequest 가 ignoreUnknown=false 라 spec 에 없는 필드는 400 으로 거부되므로,
-      // 새 필드 추가 시 stablecoin 서버의 DTO 변경이 선행되어야 한다.
+      // onchainPayment.chainId = source 체인 (paymentDigest 가 종속하는 결제 실행 체인).
       const body = {
         paymentType: 'TOPUP',
+        type: 'PAYMENT',
         sourceUserId: request.sourceUserId,
+        amount: request.amount,
         source: {
-          paymentRail: 'EVM',
-          fromAddress: request.from,
-          currency: 'USDC',
+          chainId: request.source.chainId,
+          token: request.source.tokenAddress,
+          fromAddress: request.source.address,
         },
         destination: {
-          paymentRail: 'EVM',
-          toAddress: request.to,
-          currency: 'USDC',
+          chainId: request.destination.chainId,
+          token: request.destination.tokenAddress,
+          toAddress: request.destination.address,
         },
-        amount: request.amount,
         onchainPayment: {
-          chainId: request.chainId,
+          chainId: request.source.chainId,
           paymentUuid: params.paymentUuid,
           deadline: params.deadline,
           customerEpoch: params.customerEpoch,

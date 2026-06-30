@@ -1,12 +1,12 @@
 import SwiftUI
 import dsrv_wallet_sdk_ios
 
-/// Android `PaymentSection.kt` 대응 — customer-backend `POST /payments` 호출 (Topup 결제).
+/// Android `PaymentSection.kt` 대응 — customer-backend `POST /payments` 호출 (cross-chain Topup, DNT-5965/5997).
 ///
-/// 결제(topup)는 stablecoin Payments 레일이라 **USDC 전용**입니다 (native·기타 토큰은 upstream
-/// `CreateQuoteRequest` 가 ERC-20 컨트랙트 주소를 강제 — 미지원). 토큰은 USDC 로 고정(체인별 주소
-/// 하드코딩), 잔액은 공용 `Wallet.uiState.assets` 에서 USDC 를 찾아 표시, KRW 는 price-hub.
-/// chainId/token(USDC 주소)은 여기서, paymentType=0/sourceUserId/from 은 `Wallet.pay` 가 채움.
+/// source(출금) / destination(수령) 의 chain·token·주소를 직접 입력할 수 있다. 비우면 기본값으로
+/// 폴백(source chain=선택 체인, fromAddress=내 지갑, fromTokenAddress=체인 USDC, destination=source 와 동일).
+/// USDC 잔액/KRW 행은 선택 체인 기준 참고용 표시이며, 실제 결제 토큰은 fromTokenAddress 입력이 결정한다.
+/// paymentType=0/sourceUserId 는 `Wallet.pay` 가 채움.
 struct PaymentSection: View {
     @EnvironmentObject var wallet: Wallet
 
@@ -17,8 +17,21 @@ struct PaymentSection: View {
     @State private var krwText: String? = nil
     @State private var krwLoading = false
     @State private var krwGeneration = 0
+    // source(출금) / destination(수령) 입력 — 비우면 기본값 폴백(placeholder 로 기본값 노출).
+    @State private var sourceChainText = ""
+    @State private var fromAddressText = ""
+    @State private var fromTokenText = ""
+    @State private var destChainText = ""
+    @State private var destTokenText = ""
 
     private var chainId: String { wallet.uiState.selectedChainId ?? "" }
+
+    // 입력값이 비면 사용할 기본값 (= 기존 자동 도출 동작). placeholder 와 확정 전송에 함께 쓴다.
+    private var resolvedSourceChain: String { sourceChainText.isEmpty ? chainId : sourceChainText }
+    private var resolvedFromAddress: String { fromAddressText.isEmpty ? wallet.address : fromAddressText }
+    private var resolvedFromToken: String {
+        fromTokenText.isEmpty ? (PaymentSection.usdcAddress(chainId: resolvedSourceChain) ?? "") : fromTokenText
+    }
     private var chain: ChainInfo? {
         wallet.uiState.chains.first(where: { $0.chainId == chainId })
     }
@@ -45,44 +58,87 @@ struct PaymentSection: View {
     }
 
     var body: some View {
-        SectionCard("결제 (Topup)", subtitle: "체인 \(chain?.name ?? (chainId.isEmpty ? "없음" : chainId)) · USDC") {
-            if let usdcAddr = usdcAddress {
+        SectionCard("결제 (Topup)", subtitle: "source → destination · 체인 \(chain?.name ?? (chainId.isEmpty ? "없음" : chainId))") {
+            // 잔액 helper (참고용) — 선택 체인의 USDC 잔액/KRW. 결제 토큰은 아래 fromTokenAddress 입력으로 결정.
+            if usdcAddress != nil {
                 balanceRow
-
-                Text(usdcAddr)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(spacing: 8) {
-                    TextField("to (SETTLEMENT 지갑)", text: $to)
-                        .textFieldStyle(.roundedBorder)
-                    Button("QR 스캔") { scannerOpen = true }
-                        .font(.footnote)
-                }
-
-                TextField("금액 (USDC, 기본 1)", text: $amount)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-
-                Button {
-                    guard !to.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    confirmOpen = true
-                } label: {
-                    buttonLabel("거래 확인", loading: wallet.uiState.paymentLoading, style: .filled)
-                }
-                .disabled(
-                    !wallet.uiState.sdkInitialized
-                        || wallet.publicKey.isEmpty
-                        || to.trimmingCharacters(in: .whitespaces).isEmpty
-                        || wallet.uiState.paymentLoading
-                )
-            } else {
-                Text("이 체인은 USDC topup 을 지원하지 않습니다")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            // ── source (출금) ── chain 은 가져온 목록에서 선택, 나머지는 비우면 placeholder 의 기본값.
+            Text("source (출금)")
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack {
+                Text("chain").font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Picker("chain", selection: Binding(
+                    get: { resolvedSourceChain },
+                    set: { sourceChainText = $0 }
+                )) {
+                    ForEach(wallet.uiState.chains, id: \.chainId) { c in
+                        Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            TextField(wallet.address.isEmpty ? "fromAddress (0x…)" : "fromAddress (기본: 내 지갑)", text: $fromAddressText)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+            TextField(
+                "fromTokenAddress (기본: \(PaymentSection.usdcAddress(chainId: resolvedSourceChain) ?? "0x…"))",
+                text: $fromTokenText
+            )
+            .textFieldStyle(.roundedBorder)
+            .autocorrectionDisabled()
+
+            // ── destination (수령) ── chain/token 비우면 source 와 동일.
+            Text("destination (수령)")
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                TextField("to (SETTLEMENT 지갑)", text: $to)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                Button("QR 스캔") { scannerOpen = true }
+                    .font(.footnote)
+            }
+            HStack {
+                Text("chain").font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Picker("chain", selection: $destChainText) {
+                    Text("source 와 동일").tag("")
+                    ForEach(wallet.uiState.chains, id: \.chainId) { c in
+                        Text("\(c.name) (\(c.chainId))").tag(c.chainId)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            TextField("tokenAddress (비우면 source 와 동일)", text: $destTokenText)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+
+            // ── 금액 ── destination 과 구분되는 별도 그룹.
+            Text("금액")
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            TextField("금액 (기본 1)", text: $amount)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(.roundedBorder)
+
+            Button {
+                guard !to.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                confirmOpen = true
+            } label: {
+                buttonLabel("거래 확인", loading: wallet.uiState.paymentLoading, style: .filled)
+            }
+            .disabled(
+                !wallet.uiState.sdkInitialized
+                    || wallet.publicKey.isEmpty
+                    || to.trimmingCharacters(in: .whitespaces).isEmpty
+                    || wallet.uiState.paymentLoading
+            )
 
             if let r = wallet.uiState.paymentResult {
                 VStack(alignment: .leading, spacing: 4) {
@@ -123,19 +179,29 @@ struct PaymentSection: View {
             Button("취소", role: .cancel) { confirmOpen = false }
             Button("결제") {
                 confirmOpen = false
-                guard let usdcAddr = usdcAddress else { return }
                 // amount 는 humanized 그대로 전송 — stablecoin Payments 가 decimals 변환 담당.
+                // 빈 입력은 pay() / resolved* 기본값으로 폴백.
                 let effective = amount.trimmingCharacters(in: .whitespaces).isEmpty ? "1" : amount
                 wallet.pay(
-                    chainIdInput: chainId,
-                    tokenInput: usdcAddr,
+                    sourceChainIdInput: sourceChainText,
+                    sourceTokenInput: resolvedFromToken,
+                    fromInput: fromAddressText,
+                    destChainIdInput: destChainText,
+                    destTokenInput: destTokenText,
                     toInput: to,
                     amountInput: effective
                 )
             }
         } message: {
             let effective = amount.trimmingCharacters(in: .whitespaces).isEmpty ? "1" : amount
-            return Text("받는 사람: \(to)\n금액: \(effective) USDC\n체인: \(chain?.name ?? (chainId.isEmpty ? "?" : chainId))\n\n⚠ 결제 후 되돌릴 수 없습니다.")
+            let destChainDisplay = destChainText.isEmpty ? resolvedSourceChain : destChainText
+            let destTokenDisplay = destTokenText.isEmpty ? resolvedFromToken : destTokenText
+            return Text(
+                "금액: \(effective)\n"
+                    + "source: chain \(resolvedSourceChain) · \(resolvedFromAddress) · \(resolvedFromToken)\n"
+                    + "dest: chain \(destChainDisplay) · \(to) · \(destTokenDisplay)\n\n"
+                    + "⚠ 결제 후 되돌릴 수 없습니다."
+            )
         }
     }
 

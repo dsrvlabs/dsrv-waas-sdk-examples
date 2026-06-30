@@ -1,7 +1,6 @@
 package com.dsrv.wallet.example.wallet.component
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -17,7 +15,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +29,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dsrv.wallet.example.wallet.model.Wallet
 import com.dsrv.wallet.sdk.AccountInfo
 import com.dsrv.wallet.sdk.AddressInfo
-import com.dsrv.wallet.sdk.ChainSetupStatus
 
 @Composable
 fun AccountSection(modifier: Modifier = Modifier) {
@@ -79,7 +75,6 @@ fun AccountSection(modifier: Modifier = Modifier) {
                     acc.addresses.forEach { addr ->
                         WalletItemRow(
                             address = addr,
-                            setupStatus = state.addressSetupStatusMap[addr.addressId],
                             selected = addr.address.equals(wallet.address, ignoreCase = true),
                             onClick = {
                                 wallet.selectAccount(acc.accountId)
@@ -137,58 +132,22 @@ private fun AccountSectionHeader(account: AccountInfo, onAddWallet: () -> Unit) 
 @Composable
 private fun WalletItemRow(
     address: AddressInfo,
-    setupStatus: List<ChainSetupStatus>?,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
     val display = "${address.address.take(10)}…${address.address.takeLast(6)}"
     val hasLabel = address.label?.isNotBlank() == true
-    val nonEmptyStatus = setupStatus?.takeIf { it.isNotEmpty() }
 
     ListItem(
         headlineContent = { Text(display) },
-        supportingContent = if (hasLabel || nonEmptyStatus != null) {
-            {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (hasLabel) Text(address.label!!)
-                    if (nonEmptyStatus != null) SetupStatusChips(nonEmptyStatus)
-                }
-            }
+        supportingContent = if (hasLabel) {
+            { Text(address.label!!) }
         } else null,
         leadingContent = {
             RadioButton(selected = selected, onClick = onClick)
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
-}
-
-/** Wallet ViewModel 의 [WalletUiState.addressSetupStatusMap] (batch fetched) 으로부터 받은 위임·승인 요약 칩 표시. */
-@Composable
-private fun SetupStatusChips(setupStatus: List<ChainSetupStatus>) {
-    val total = setupStatus.size
-    val delegated = setupStatus.count { it.delegated }
-    val approved = setupStatus.count { chain -> chain.approvals.any { it.approved } }
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        StatusBadge("위임 $delegated/$total", active = delegated > 0)
-        StatusBadge("승인 $approved/$total", active = approved > 0)
-    }
-}
-
-@Composable
-private fun StatusBadge(text: String, active: Boolean) {
-    Surface(
-        color = if (active) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(6.dp),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
-    }
 }
 
 @Composable

@@ -40,6 +40,7 @@ class MyAuthHandler(
                 put("publicKey", request.deviceInfo.publicKey)
                 put("model", request.deviceInfo.model)
                 put("osVersion", request.deviceInfo.osVersion)
+                put("deviceId", request.deviceInfo.deviceId)
                 put("isVirtual", request.deviceInfo.isVirtual)
             })
         }.toString()

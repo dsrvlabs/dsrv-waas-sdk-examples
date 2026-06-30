@@ -16,7 +16,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,15 +42,16 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dsrv.wallet.example.wallet.model.Wallet
+import com.dsrv.wallet.sdk.ChainInfo
 import kotlinx.coroutines.launch
 
 /**
- * customer-backend `POST /payments` 호출 — Topup 결제 흐름.
+ * customer-backend `POST /payments` 호출 — Topup 결제 흐름 (cross-chain, DNT-5965/5997).
  *
- * 결제(topup)는 stablecoin Payments 레일이라 **USDC 전용**입니다 (native·기타 토큰은 upstream
- * `CreateQuoteRequest` 가 ERC-20 컨트랙트 주소를 강제 — 미지원). 따라서 토큰은 USDC 로 고정
- * (체인별 컨트랙트 주소 하드코딩), 잔액은 공용 [Wallet.uiState] 자산목록에서 USDC 를 찾아 표시,
- * KRW 는 price-hub. chainId/token(USDC 주소)은 여기서, paymentType=0/sourceUserId/from 은 [Wallet.pay] 가 채움.
+ * source(출금) / destination(수령) 의 chain·token·주소를 직접 입력할 수 있다. 비우면 기본값으로
+ * 폴백(source chain=선택 체인, fromAddress=내 지갑, fromTokenAddress=체인 USDC, destination=source 와 동일).
+ * USDC 잔액/KRW 행은 선택 체인 기준 참고용 표시이며, 실제 결제 토큰은 fromTokenAddress 입력이 결정한다.
+ * paymentType=0/sourceUserId 는 [Wallet.pay] 가 채움.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +85,17 @@ fun PaymentSection(modifier: Modifier = Modifier) {
     var amount by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     var scanner by remember { mutableStateOf(false) }
+    // source(출금) / destination(수령) 입력 — 비우면 기본값 폴백(placeholder 로 기본값 노출).
+    var sourceChainText by remember { mutableStateOf("") }
+    var fromAddressText by remember { mutableStateOf("") }
+    var fromTokenText by remember { mutableStateOf("") }
+    var destChainText by remember { mutableStateOf("") }
+    var destTokenText by remember { mutableStateOf("") }
+
+    // 입력값이 비면 사용할 기본값 (= 기존 자동 도출 동작). placeholder 와 확정 전송에 함께 쓴다.
+    val resolvedSourceChain = sourceChainText.ifBlank { chainId }
+    val resolvedFromAddress = fromAddressText.ifBlank { address }
+    val resolvedFromToken = fromTokenText.ifBlank { usdcAddress(resolvedSourceChain).orEmpty() }
 
     /** 공용 목록 갱신 시 USDC 잔액 기준 KRW 환산 (미보유면 "0" → ₩0). */
     suspend fun refreshKrw() {
@@ -106,9 +121,10 @@ fun PaymentSection(modifier: Modifier = Modifier) {
 
     SectionContainer(
         title = "결제 (Topup)",
-        subtitle = "체인 ${chain?.name ?: chainId.ifEmpty { "없음" }} · USDC",
+        subtitle = "source → destination · 체인 ${chain?.name ?: chainId.ifEmpty { "없음" }}",
         modifier = modifier,
     ) {
+        // 잔액 helper (참고용) — 선택 체인의 USDC 잔액/KRW. 결제 토큰은 아래 fromTokenAddress 입력으로 결정.
         if (usdcAddr != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -116,7 +132,7 @@ fun PaymentSection(modifier: Modifier = Modifier) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "USDC 잔액",
+                        "USDC 잔액 (선택 체인, 참고용)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -148,63 +164,115 @@ fun PaymentSection(modifier: Modifier = Modifier) {
                 }
                 TextButton(onClick = { scope.launch { wallet.loadAssets() } }, enabled = !loading) { Text("새로고침") }
             }
-
-            Spacer(Modifier.height(8.dp))
-            Text(
-                usdcAddr,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            )
-
             Spacer(Modifier.height(10.dp))
+        }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = to,
-                    onValueChange = { to = it },
-                    label = { Text("to (SETTLEMENT 지갑)") },
-                    placeholder = { Text("0x…") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = { scanner = true }) { Text("QR 스캔") }
-            }
-            Spacer(Modifier.height(6.dp))
+        // ── source (출금) ── 비우면 placeholder 의 기본값 사용.
+        Text(
+            "source (출금)",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        ChainDropdown(
+            label = "chain",
+            chains = state.chains,
+            selectedChainId = resolvedSourceChain,
+            sameAsSourceOption = false,
+            onSelect = { sourceChainText = it },
+        )
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = fromAddressText,
+            onValueChange = { fromAddressText = it },
+            label = { Text("fromAddress") },
+            placeholder = { Text(address.ifEmpty { "0x… (기본: 내 지갑)" }) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = fromTokenText,
+            onValueChange = { fromTokenText = it },
+            label = { Text("fromTokenAddress") },
+            placeholder = { Text(usdcAddress(resolvedSourceChain) ?: "0x… (USDC)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // ── destination (수령) ── chain/token 비우면 source 와 동일.
+        Text(
+            "destination (수령)",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                label = { Text("금액 (USDC, 기본 1)") },
+                value = to,
+                onValueChange = { to = it },
+                label = { Text("to (SETTLEMENT 지갑)") },
+                placeholder = { Text("0x…") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(10.dp))
+            TextButton(onClick = { scanner = true }) { Text("QR 스캔") }
+        }
+        Spacer(Modifier.height(6.dp))
+        ChainDropdown(
+            label = "chain (비우면 source 와 동일)",
+            chains = state.chains,
+            selectedChainId = destChainText,
+            sameAsSourceOption = true,
+            onSelect = { destChainText = it },
+        )
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = destTokenText,
+            onValueChange = { destTokenText = it },
+            label = { Text("tokenAddress") },
+            placeholder = { Text("source 와 동일") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            Button(
-                onClick = {
-                    if (to.isBlank()) return@Button
-                    confirm = true
-                },
-                enabled = state.sdkInitialized
-                    && wallet.publicKey.isNotEmpty()
-                    && to.isNotBlank()
-                    && !state.paymentLoading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.paymentLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                else Text("거래 확인")
-            }
-        } else {
-            Text(
-                "이 체인은 USDC topup 을 지원하지 않습니다",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            )
+        Spacer(Modifier.height(12.dp))
+
+        // ── 금액 ── destination 과 구분되는 별도 그룹.
+        Text(
+            "금액",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value = amount,
+            onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+            label = { Text("금액 (기본 1)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(10.dp))
+
+        Button(
+            onClick = {
+                if (to.isBlank()) return@Button
+                confirm = true
+            },
+            enabled = state.sdkInitialized
+                && wallet.publicKey.isNotEmpty()
+                && to.isNotBlank()
+                && !state.paymentLoading,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.paymentLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            else Text("거래 확인")
         }
 
         state.paymentResult?.let { r ->
@@ -269,15 +337,23 @@ fun PaymentSection(modifier: Modifier = Modifier) {
 
     if (confirm) {
         val effectiveAmount = amount.trim().ifEmpty { "1" }
+        // destination chain/token 비우면 source 와 동일하게 표시.
+        val destChainDisplay = destChainText.ifBlank { resolvedSourceChain }
+        val destTokenDisplay = destTokenText.ifBlank { resolvedFromToken }
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text("결제 확인") },
             text = {
                 Column {
-                    ConfirmRow("받는 사람", to, mono = true)
-                    ConfirmRow("금액", "$effectiveAmount USDC")
-                    usdcAddr?.let { ConfirmRow("토큰", it, mono = true) }
-                    (chain?.name ?: chainId.ifEmpty { null })?.let { ConfirmRow("체인", it) }
+                    ConfirmRow("금액", effectiveAmount)
+                    Spacer(Modifier.height(6.dp))
+                    ConfirmRow("source chain", resolvedSourceChain)
+                    ConfirmRow("from", resolvedFromAddress, mono = true)
+                    ConfirmRow("source token", resolvedFromToken, mono = true)
+                    Spacer(Modifier.height(6.dp))
+                    ConfirmRow("dest chain", destChainDisplay)
+                    ConfirmRow("to", to, mono = true)
+                    ConfirmRow("dest token", destTokenDisplay, mono = true)
                     Spacer(Modifier.height(10.dp))
                     Text(
                         "⚠ 결제 후 되돌릴 수 없습니다.",
@@ -289,19 +365,73 @@ fun PaymentSection(modifier: Modifier = Modifier) {
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false
-                    if (usdcAddr != null) {
-                        // amount 는 humanized 그대로 전송 — stablecoin Payments 가 decimals 변환 담당.
-                        wallet.pay(
-                            toInput = to,
-                            chainIdInput = chainId,
-                            tokenInput = usdcAddr,
-                            amountInput = effectiveAmount,
-                        )
-                    }
+                    // amount 는 humanized 그대로 전송 — stablecoin Payments 가 decimals 변환 담당.
+                    // 빈 입력은 pay() / resolved* 기본값으로 폴백.
+                    wallet.pay(
+                        sourceChainIdInput = sourceChainText,
+                        sourceTokenInput = resolvedFromToken,
+                        fromInput = fromAddressText,
+                        destChainIdInput = destChainText,
+                        destTokenInput = destTokenText,
+                        toInput = to,
+                        amountInput = effectiveAmount,
+                    )
                 }) { Text("결제") }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("취소") } },
         )
+    }
+}
+
+/**
+ * 가져온 chain 목록([chains]) 기반 chainId select.
+ *
+ * @param selectedChainId 현재 값. 빈 문자열이면 [sameAsSourceOption] 시 "source 와 동일" 로 표시.
+ * @param sameAsSourceOption destination 용 — 목록 맨 위에 "source 와 동일"(빈 값) 옵션 추가.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChainDropdown(
+    label: String,
+    chains: List<ChainInfo>,
+    selectedChainId: String,
+    sameAsSourceOption: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val sameLabel = "source 와 동일"
+    val displayValue = when {
+        selectedChainId.isEmpty() -> if (sameAsSourceOption) sameLabel else ""
+        else -> chains.firstOrNull { it.chainId == selectedChainId }
+            ?.let { "${it.name} (${it.chainId})" } ?: selectedChainId
+    }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = displayValue,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (sameAsSourceOption) {
+                DropdownMenuItem(
+                    text = { Text(sameLabel) },
+                    onClick = { onSelect(""); expanded = false },
+                )
+            }
+            chains.forEach { c ->
+                DropdownMenuItem(
+                    text = { Text("${c.name} (${c.chainId})") },
+                    onClick = { onSelect(c.chainId); expanded = false },
+                )
+            }
+        }
     }
 }
 

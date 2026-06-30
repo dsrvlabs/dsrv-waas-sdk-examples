@@ -94,8 +94,9 @@ public struct DeviceInfo {
   public let osVersion: Swift.String
   public let isVirtual: Swift.Bool
   public let attestationObject: Swift.String?
+  public let deviceId: Swift.String
   public let platform: Swift.String
-  public init(keyId: Swift.String? = nil, publicKey: Swift.String? = nil, model: Swift.String, osVersion: Swift.String, isVirtual: Swift.Bool, attestationObject: Swift.String? = nil)
+  public init(keyId: Swift.String? = nil, publicKey: Swift.String? = nil, model: Swift.String, osVersion: Swift.String, isVirtual: Swift.Bool, attestationObject: Swift.String? = nil, deviceId: Swift.String)
 }
 public struct ChallengeRequest {
   public let sdkId: Swift.String

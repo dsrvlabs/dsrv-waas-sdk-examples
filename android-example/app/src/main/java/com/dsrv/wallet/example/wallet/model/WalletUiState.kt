@@ -54,9 +54,6 @@ data class WalletUiState(
     val setupStatusLoading: Boolean = false,
     val setupStatusError: String? = null,
     val setupStatus: List<ChainSetupStatus> = emptyList(),
-    /** wallet list 화면의 위임/승인 chip 표시용 — addressId → ChainSetupStatus 목록.
-     *  getAccountList 직후 batch fetch 로 채워짐 (N 회 getSetupStatus 호출). */
-    val addressSetupStatusMap: Map<String, List<ChainSetupStatus>> = emptyMap(),
     // Payment (customer-backend POST /payments — TOPUP 흐름)
     val paymentLoading: Boolean = false,
     val paymentError: String? = null,
