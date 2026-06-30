@@ -46,9 +46,10 @@ export class DeviceInfoDto {
   attestationObject?: string;
 
   // Stable per-device id (survives reinstall) used by the backend to dedup reinstalls.
+  // Required to be present, but may be an empty string: the SDK intentionally sends "" as a
+  // fail-safe (unreliable SSAID / Keychain write failure) to tell the backend to skip dedup.
   @IsString()
-  @IsOptional()
-  deviceId?: string;
+  deviceId: string;
 }
 
 export class AuthenticateDto {

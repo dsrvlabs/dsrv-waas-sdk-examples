@@ -283,6 +283,7 @@ final class DartAuthHandler: AuthHandler {
                 "publicKey": request.deviceInfo.publicKey as Any,
                 "model": request.deviceInfo.model,
                 "osVersion": request.deviceInfo.osVersion,
+                "deviceId": request.deviceInfo.deviceId,
                 "isVirtual": request.deviceInfo.isVirtual,
                 "attestationObject": request.deviceInfo.attestationObject as Any,
                 "platform": "IOS",

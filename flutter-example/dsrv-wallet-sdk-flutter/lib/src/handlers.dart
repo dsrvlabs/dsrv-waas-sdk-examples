@@ -37,6 +37,10 @@ class DeviceInfo {
   final String? publicKey;
   final String model;
   final String osVersion;
+
+  /// 재설치 후에도 유지되는 안정적 per-device 식별자 (native 가 채움).
+  /// SSAID/Keychain 불량 등 fail-safe 상황에선 빈 문자열일 수 있어 백엔드가 dedup 을 건너뛴다.
+  final String deviceId;
   final bool isVirtual;
   final String? attestationObject;
   final String platform; // "IOS" / "ANDROID"
@@ -46,6 +50,7 @@ class DeviceInfo {
     this.publicKey,
     required this.model,
     required this.osVersion,
+    required this.deviceId,
     required this.isVirtual,
     this.attestationObject,
     required this.platform,
@@ -56,6 +61,7 @@ class DeviceInfo {
         publicKey: map['publicKey'] as String?,
         model: (map['model'] as String?) ?? '',
         osVersion: (map['osVersion'] as String?) ?? '',
+        deviceId: (map['deviceId'] as String?) ?? '',
         isVirtual: (map['isVirtual'] as bool?) ?? false,
         attestationObject: map['attestationObject'] as String?,
         platform: (map['platform'] as String?) ?? '',

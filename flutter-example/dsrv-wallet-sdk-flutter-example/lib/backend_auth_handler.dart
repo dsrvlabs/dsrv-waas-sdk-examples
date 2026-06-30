@@ -24,6 +24,7 @@ class BackendAuthHandler implements AuthHandler {
           'publicKey': request.deviceInfo.publicKey,
           'model': request.deviceInfo.model,
           'osVersion': request.deviceInfo.osVersion,
+          'deviceId': request.deviceInfo.deviceId,
           'isVirtual': request.deviceInfo.isVirtual,
           // iOS 실기기는 App Attest attestationObject 가 필수 (Android 는 null → 무시됨)
           'attestationObject': request.deviceInfo.attestationObject,

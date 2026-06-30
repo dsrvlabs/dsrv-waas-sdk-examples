@@ -297,6 +297,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             "publicKey" to r.deviceInfo.publicKey,
             "model" to r.deviceInfo.model,
             "osVersion" to r.deviceInfo.osVersion,
+            "deviceId" to r.deviceInfo.deviceId,
             "isVirtual" to r.deviceInfo.isVirtual,
             "platform" to "ANDROID"
         )
