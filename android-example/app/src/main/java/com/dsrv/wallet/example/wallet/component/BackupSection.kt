@@ -54,6 +54,26 @@ fun BackupSection(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(6.dp))
             Text("✓ $it", style = MaterialTheme.typography.bodySmall)
         }
+        // address 별 결과를 화면에 직접 표시 (성공 / stale 불가)
+        if (state.backupResults.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            state.backupResults.forEach { r ->
+                val short = if (r.address.length >= 12) r.address.take(12) + "…" else r.address
+                if (r.success) {
+                    Text(
+                        "✓ $short  백업 완료",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Text(
+                        "⛔ $short  백업 불가${r.error?.let { " — $it" } ?: ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
         state.backupError?.let {
             Spacer(Modifier.height(6.dp))
             Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

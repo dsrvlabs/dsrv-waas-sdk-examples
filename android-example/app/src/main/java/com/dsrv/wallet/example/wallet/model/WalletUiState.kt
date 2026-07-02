@@ -1,9 +1,11 @@
 package com.dsrv.wallet.example.wallet.model
 
 import com.dsrv.wallet.sdk.AccountInfo
+import com.dsrv.wallet.sdk.BackupResult
 import com.dsrv.wallet.sdk.ChainSetupStatus
 import com.dsrv.wallet.sdk.ChainInfo
 import com.dsrv.wallet.sdk.ChainTxResult
+import com.dsrv.wallet.sdk.RestoreResult
 
 data class WalletUiState(
     val sdkInitialized: Boolean = false,
@@ -34,6 +36,7 @@ data class WalletUiState(
     val backupLoading: Boolean = false,
     val backupError: String? = null,
     val backupResult: String? = null,
+    val backupResults: List<BackupResult> = emptyList(),
     val backupDump: String? = null,
     val backupDumpLoading: Boolean = false,
     val backupClearLoading: Boolean = false,
@@ -41,6 +44,7 @@ data class WalletUiState(
     val restoreLoading: Boolean = false,
     val restoreError: String? = null,
     val restoreResult: String? = null,
+    val restoreResults: List<RestoreResult> = emptyList(),
     // Delegate / Revoke — chain 별 시도 결과 (성공/실패 모두 보존)
     val delegateLoading: Boolean = false,
     val delegateError: String? = null,

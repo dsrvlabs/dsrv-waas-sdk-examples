@@ -54,16 +54,16 @@ public enum DSRVWallet {
   nonisolated(nonsending) public static func sign(address: Swift.String, hashedMessage: Swift.String, signId: Swift.String, messageType: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.SignResult>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func broadcastTx(address: Swift.String, txId: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxHashResult>
+  nonisolated(nonsending) public static func broadcastTx(address: Swift.String, txId: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.BroadcastResult>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func transfer(address: Swift.String, chainId: Swift.String, asset: dsrv_wallet_sdk_ios.TransferAsset, recipient: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.TxHashResult>
+  nonisolated(nonsending) public static func transfer(address: Swift.String, chainId: Swift.String, asset: dsrv_wallet_sdk_ios.TransferAsset, recipient: Swift.String, amount: Swift.String) async -> dsrv_wallet_sdk_ios.WalletResult<dsrv_wallet_sdk_ios.BroadcastResult>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func backup() async -> dsrv_wallet_sdk_ios.WalletResult<Swift.Void>
+  nonisolated(nonsending) public static func backup() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.BackupResult]>
   #endif
   #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  nonisolated(nonsending) public static func restore() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.RestoredKey]>
+  nonisolated(nonsending) public static func restore() async -> dsrv_wallet_sdk_ios.WalletResult<[dsrv_wallet_sdk_ios.RestoreResult]>
   #endif
   public static func dumpBackupForDebug() -> Swift.String
   public static func clearBackupForDebug()
@@ -130,7 +130,13 @@ public enum BackupStatus : Swift.String, Swift.Sendable {
     get
   }
 }
-public struct RestoredKey {
+public struct RestoreResult {
+  public let address: Swift.String
+  public let success: Swift.Bool
+  public let error: Swift.String?
+  public init(address: Swift.String, success: Swift.Bool, error: Swift.String? = nil)
+}
+public struct BackupResult {
   public let address: Swift.String
   public let success: Swift.Bool
   public let error: Swift.String?
@@ -149,16 +155,20 @@ public struct SignResult {
   public let v: Swift.Int
   public init(r: Swift.String, s: Swift.String, v: Swift.Int)
 }
-public struct TxHashResult {
-  public let txHash: Swift.String
-  public init(txHash: Swift.String)
+public struct BroadcastResult {
+  public let txHash: Swift.String?
+  public let status: Swift.String?
+  public init(txHash: Swift.String? = nil, status: Swift.String? = nil)
 }
+@available(*, deprecated, renamed: "BroadcastResult")
+public typealias TxHashResult = dsrv_wallet_sdk_ios.BroadcastResult
 public struct ChainTxResult : Swift.Sendable {
   public let chainId: Swift.String
   public let outcome: Swift.String
   public let txHash: Swift.String?
   public let errorMessage: Swift.String?
-  public init(chainId: Swift.String, outcome: Swift.String, txHash: Swift.String? = nil, errorMessage: Swift.String? = nil)
+  public let status: Swift.String?
+  public init(chainId: Swift.String, outcome: Swift.String, txHash: Swift.String? = nil, errorMessage: Swift.String? = nil, status: Swift.String? = nil)
   public var isSuccess: Swift.Bool {
     get
   }

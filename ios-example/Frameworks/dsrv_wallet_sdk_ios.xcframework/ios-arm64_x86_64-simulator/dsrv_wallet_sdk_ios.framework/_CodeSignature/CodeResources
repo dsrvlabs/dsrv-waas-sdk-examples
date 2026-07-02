@@ -6,47 +6,47 @@
 	<dict>
 		<key>Info.plist</key>
 		<data>
-		ko8T9HS59tTsGuPMDkPNE83FTEA=
+		Z2z2vXGt+xkD6mMr2Fl2Wp7caZM=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.abi.json</key>
 		<data>
-		/XRqBFR/QvlmF72fTAbnIlYRRjE=
+		f9H7cXeZyBFmRI5LDuQrOPX63a4=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.private.swiftinterface</key>
 		<data>
-		Vclqf67BQyDmov9bBtFRqtSWG24=
+		40AX66va0SUyvqxRt8TA3/Ak02A=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftdoc</key>
 		<data>
-		7g+oEPr31Z7nPD4mplWQhZA6XW8=
+		nZTAm2wJ8f4N0rAjNmey3G7Yk5c=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftinterface</key>
 		<data>
-		Vclqf67BQyDmov9bBtFRqtSWG24=
+		40AX66va0SUyvqxRt8TA3/Ak02A=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftmodule</key>
 		<data>
-		ZYcl8AYlAJ0odK0dZ7GPN33lRro=
+		RTKNsZgxxGIrFnGMkcr4TypIL9U=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.abi.json</key>
 		<data>
-		/XRqBFR/QvlmF72fTAbnIlYRRjE=
+		f9H7cXeZyBFmRI5LDuQrOPX63a4=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.private.swiftinterface</key>
 		<data>
-		Ok6ywhmBGuLwnonyqP8G+YcrSNM=
+		i/2OrKxVW7BZ8J3oD03MYCiiOGY=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftdoc</key>
 		<data>
-		U9H3giZuu04Ukon9pCXLUaB15Tw=
+		ZXdPvKvaANqq82MfwAvHmUV+p4M=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftinterface</key>
 		<data>
-		Ok6ywhmBGuLwnonyqP8G+YcrSNM=
+		i/2OrKxVW7BZ8J3oD03MYCiiOGY=
 		</data>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftmodule</key>
 		<data>
-		b9PT3dlRLWZZ0UYTyF/RiEIeXOc=
+		BcENa74zAOSzJxAlR+zCGBHIhlo=
 		</data>
 	</dict>
 	<key>files2</key>
@@ -55,70 +55,70 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			e5drkJ5gpZe65awryMRyZp41DOv51EIMBfl2Puk7v0I=
+			3+tdqHw5DWMhnROvTHeVJ6uoNlQAJGaBdjsqeYqDeJY=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.private.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			HqjI2LpP7vB96dMXP8AR53KrjtvjASQWPLP6zbrI090=
+			VgDgurUkI4+D+ZJ7kT6lsCLnflXbkPkkj+GearRJ8Uw=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftdoc</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			2jz6E3yyds9DXWf7rHyFlGMBalCX4aQOMS+6RYtu0+g=
+			ob3KX/IEcZBTS8pcFaACAdmLRjDALL67AmKHdOVjE1U=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			HqjI2LpP7vB96dMXP8AR53KrjtvjASQWPLP6zbrI090=
+			VgDgurUkI4+D+ZJ7kT6lsCLnflXbkPkkj+GearRJ8Uw=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/arm64-apple-ios-simulator.swiftmodule</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Gey1gVLDIOFFqX8lFCw2fqwLY5IpkOzE6x87L5MAoCc=
+			BeAOviHknYN22rD6Zb/3oGLvvea+cjNYZ7B7LtLGbtc=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.abi.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			e5drkJ5gpZe65awryMRyZp41DOv51EIMBfl2Puk7v0I=
+			3+tdqHw5DWMhnROvTHeVJ6uoNlQAJGaBdjsqeYqDeJY=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.private.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			/Du5sSxni/R5th1YEgAoM1qXRihRLgyHwLze3mCTodQ=
+			pPRalZO8hjIBWHZuJ57W67PjKmotp/AKlhqq14iaRd8=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftdoc</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			ySIVW8O5aS9Gr5PIMwjm90xCYCL1NFgC05HPF2HXnPM=
+			iKV4f7mRy+sHnjBJNTmLSxcbRlCux0SYEmF4cGnrwfY=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			/Du5sSxni/R5th1YEgAoM1qXRihRLgyHwLze3mCTodQ=
+			pPRalZO8hjIBWHZuJ57W67PjKmotp/AKlhqq14iaRd8=
 			</data>
 		</dict>
 		<key>Modules/dsrv_wallet_sdk_ios.swiftmodule/x86_64-apple-ios-simulator.swiftmodule</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			AFbBOYVp5drLD0BJqp2WAgdl2Vk87GXOOxZ6a1Necco=
+			RK7u0DU3M/l8UqCvrR0eq1tGyGJWET/xoBG/gobQW+Q=
 			</data>
 		</dict>
 	</dict>

@@ -357,11 +357,11 @@ fun refresh() {
 | `DSRVWallet.createAccount(label)` | Account 생성 (idempotent) | `WalletResult<AccountResult>` |
 | `DSRVWallet.getAccountList()` | 서버 account 목록 조회 | `WalletResult<List<AccountInfo>>` |
 | `DSRVWallet.getChainList()` | 지원 체인 목록 조회 | `WalletResult<List<ChainInfo>>` |
-| `DSRVWallet.create(accountId?, chainType, label?)` | MPC 지갑 생성 + WaaS 등록 | `WalletResult<KeyCreateResult>` |
-| `DSRVWallet.transfer(address, chainId, asset, recipient, amount: String)` | 전송 원샷 (build hash → MPC sign → broadcast) | `WalletResult<TxHashResult>` |
+| `DSRVWallet.createAddress(accountId, chainType, label?)` | MPC 지갑 생성 + WaaS 등록 | `WalletResult<KeyCreateResult>` |
+| `DSRVWallet.transfer(address, chainId, asset, recipient, amount: String)` | 전송 원샷 (build hash → MPC sign → broadcast) | `WalletResult<BroadcastResult>` |
 | `DSRVWallet.buildTx(...)` | 단계별 전송 1 — build hash | `WalletResult<TxBuildResult>` |
 | `DSRVWallet.sign(address, hashedMessage, signId, messageType)` | 단계별 전송 2 — MPC 서명 | `WalletResult<SignResult>` |
-| `DSRVWallet.broadcastTx(address, txId)` | 단계별 전송 3 — broadcast | `WalletResult<TxHashResult>` |
+| `DSRVWallet.broadcastTx(address, txId)` | 단계별 전송 3 — broadcast | `WalletResult<BroadcastResult>` |
 | `DSRVWallet.delegate(address)` | EIP-7702 위임 (chain 일괄, 각 chain isSuccess 로 분기) | `WalletResult<List<ChainTxResult>>` |
 | `DSRVWallet.revoke(address)` | EIP-7702 위임 철회 (chain 일괄) | `WalletResult<List<ChainTxResult>>` |
 | `DSRVWallet.approve(address, amount: String)` | 결제 토큰 multicall approve. `amount` sentinel: `"MAX"` (unbounded) / `"0"` (revoke). SDK 가 uppercase 정규화. | `WalletResult<List<ChainTxResult>>` |

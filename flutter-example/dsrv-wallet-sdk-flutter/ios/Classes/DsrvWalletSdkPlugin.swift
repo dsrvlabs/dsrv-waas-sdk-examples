@@ -106,7 +106,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 recipient: try requiredString(args, "recipient"),
                 amount: try requiredString(args, "amount")
             )
-            reply(r, result) { ["txHash": $0.txHash] }
+            reply(r, result) { ["txHash": $0.txHash, "status": $0.status] }
 
         case "buildTx":
             let r = await DSRVWallet.buildTx(
@@ -125,7 +125,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
                 address: try requiredString(args, "address"),
                 txId: try requiredString(args, "txId")
             )
-            reply(r, result) { ["txHash": $0.txHash] }
+            reply(r, result) { ["txHash": $0.txHash, "status": $0.status] }
 
         case "sign":
             let r = await DSRVWallet.sign(
@@ -160,7 +160,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
 
         case "backup":
             let r = await DSRVWallet.backup()
-            reply(r, result) { _ in nil }
+            reply(r, result) { $0.map(self.backupResultMap) }
 
         case "restore":
             let r = await DSRVWallet.restore()
@@ -234,7 +234,11 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
         return ["chainId": c.chainId, "name": c.name, "chainType": c.chainType, "networkType": c.networkType]
     }
 
-    private func restoredMap(_ r: RestoredKey) -> [String: Any?] {
+    private func restoredMap(_ r: RestoreResult) -> [String: Any?] {
+        return ["address": r.address, "success": r.success, "error": r.error]
+    }
+
+    private func backupResultMap(_ r: BackupResult) -> [String: Any?] {
         return ["address": r.address, "success": r.success, "error": r.error]
     }
 
@@ -244,6 +248,7 @@ public class DsrvWalletSdkPlugin: NSObject, FlutterPlugin {
             "outcome": r.outcome,
             "txHash": r.txHash,
             "errorMessage": r.errorMessage,
+            "status": r.status,
         ]
     }
 

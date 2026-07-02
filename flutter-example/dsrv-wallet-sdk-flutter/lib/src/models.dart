@@ -23,22 +23,36 @@ class KeyCreateResult {
       );
 }
 
-/// 체인 트랜잭션 해시.
-class TxHashResult {
-  final String txHash; // 0x-prefixed
+/// transfer / approve broadcast **접수** 결과. 정상 응답에서 [status] 는 항상 채워지며 [txHash] 는
+/// GS_ON(bundler) 경로에서 null 이다 — 두 필드가 동시에 null 인 경우는 비정상 응답으로 간주한다.
+class BroadcastResult {
+  /// 0x-prefixed. GS_ON(gas sponsor/bundler) 경로에서는 broadcast 접수 시점에 아직 발급 안 됨 (null).
+  /// 확정 txHash 는 batchTxId 로 후속 조회/indexer 에서 받는다. GS_OFF 경로는 즉시 채워진다.
+  final String? txHash;
 
-  const TxHashResult({required this.txHash});
+  /// broadcast 직후 서버 트랜잭션 상태 (예: `BROADCAST`, `BROADCAST_PENDING`, `BATCHED`, `MINED_FAILED` 등).
+  /// SDK 는 값을 해석하지 않고 원본을 그대로 전달한다 — 성공/실패 판단은 호출자(앱) 몫이며, 온체인 체결
+  /// 결과는 batchTxId 기반 후속 조회/indexer 로 확인한다. 응답에 status 가 없으면 null.
+  final String? status;
 
-  factory TxHashResult.fromMap(Map<dynamic, dynamic> map) =>
-      TxHashResult(txHash: map['txHash'] as String);
+  const BroadcastResult({this.txHash, this.status});
+
+  factory BroadcastResult.fromMap(Map<dynamic, dynamic> map) => BroadcastResult(
+        txHash: map['txHash'] as String?,
+        status: map['status'] as String?,
+      );
 }
+
+@Deprecated('TxHashResult 는 BroadcastResult 로 이름이 변경되었습니다 (status 필드 추가로 의미 확장).')
+typedef TxHashResult = BroadcastResult;
 
 /// Bulk operation (approve / delegate / revoke) 의 chain 별 결과. server 가 결정한 chain 목록 각각에
 /// 대해 sign + submit 을 시도한 outcome 을 표현 (서버 응답의 outcome 과 1:1 대응).
 ///
 /// [outcome] 값:
-/// - `NEW` (delegate) / `BUILT` (approve) — 신규 빌드 + sign + submit 성공. [txHash] non-null.
-/// - `RESUMED` (delegate) — 이전 broadcast 실패로 보관된 SIGNED 재사용, 재 broadcast 성공. [txHash] non-null.
+/// - `NEW` (delegate) / `BUILT` (approve) — 신규 빌드 + sign + submit 성공. GS_ON(bundler) 경로에서는
+///   broadcast 접수만 되고 [txHash] 는 null — batchTxId/delegationId 로 확정 txHash 를 추적한다.
+/// - `RESUMED` (delegate) — 이전 broadcast 실패로 보관된 SIGNED 재사용, 재 broadcast 접수 성공. [txHash] null 가능.
 /// - `ALREADY_DELEGATED` (delegate) — 이미 위임된 chain. 추가 처리 불필요. [txHash] null.
 /// - `SKIPPED` (approve) — 대상 token 없음. [txHash] null.
 /// - `FAILED` — 서버 빌드 또는 SDK sign/submit 실패. [errorMessage] non-null.
@@ -54,13 +68,22 @@ class ChainTxResult {
   final String? txHash;
   final String? errorMessage;
 
+  /// broadcast 직후 서버 트랜잭션 상태 원본 (예: `BROADCAST`, `BATCHED`, `MINED_FAILED` 등).
+  /// SDK 는 해석하지 않고 그대로 전달한다. submit 을 수행하지 않은 [outcome] (`SKIPPED`,
+  /// `ALREADY_DELEGATED`, 빌드 `FAILED`) 에서는 null.
+  final String? status;
+
   const ChainTxResult({
     required this.chainId,
     required this.outcome,
     this.txHash,
     this.errorMessage,
+    this.status,
   });
 
+  /// 빌드+서명+broadcast **접수** 단계의 성공 여부(모든 non-FAILED [outcome])만 나타낸다.
+  /// **온체인 체결 성공을 의미하지 않는다** — 실제 체결 결과는 [status] 와 batchTxId/delegationId
+  /// 기반 후속 조회/indexer 로 판단해야 한다.
   bool get isSuccess => outcome != 'FAILED';
 
   factory ChainTxResult.fromMap(Map<dynamic, dynamic> map) => ChainTxResult(
@@ -68,6 +91,7 @@ class ChainTxResult {
         outcome: map['outcome'] as String,
         txHash: map['txHash'] as String?,
         errorMessage: map['errorMessage'] as String?,
+        status: map['status'] as String?,
       );
 }
 
@@ -119,14 +143,31 @@ class SignResult {
 }
 
 /// restore() 의 지갑별 복원 결과.
-class RestoredKey {
+class RestoreResult {
   final String address;
   final bool success;
   final String? error;
 
-  const RestoredKey({required this.address, required this.success, this.error});
+  const RestoreResult({required this.address, required this.success, this.error});
 
-  factory RestoredKey.fromMap(Map<dynamic, dynamic> map) => RestoredKey(
+  factory RestoreResult.fromMap(Map<dynamic, dynamic> map) => RestoreResult(
+        address: map['address'] as String,
+        success: map['success'] as bool,
+        error: map['error'] as String?,
+      );
+}
+
+/// backup() 의 address 별 결과.
+/// - [success] = true: cloud 에 백업됨
+/// - [success] = false: 백업 안 됨. [error] 에 사유 (예: 로컬 세대가 cloud 보다 낮아 stale 로 skip)
+class BackupResult {
+  final String address;
+  final bool success;
+  final String? error;
+
+  const BackupResult({required this.address, required this.success, this.error});
+
+  factory BackupResult.fromMap(Map<dynamic, dynamic> map) => BackupResult(
         address: map['address'] as String,
         success: map['success'] as bool,
         error: map['error'] as String?,

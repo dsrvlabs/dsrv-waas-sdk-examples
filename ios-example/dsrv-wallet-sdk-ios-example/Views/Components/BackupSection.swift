@@ -1,4 +1,5 @@
 import SwiftUI
+import dsrv_wallet_sdk_ios
 
 struct BackupSection: View {
     @EnvironmentObject var wallet: Wallet
@@ -23,6 +24,24 @@ struct BackupSection: View {
             if let result = wallet.uiState.backupResult {
                 Text("✓ \(result)")
                     .font(.footnote)
+            }
+            // address 별 결과를 화면에 직접 표시 (성공 / stale 불가)
+            if !wallet.uiState.backupResults.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(wallet.uiState.backupResults, id: \.address) { r in
+                        let short = r.address.count >= 12 ? String(r.address.prefix(12)) + "…" : r.address
+                        if r.success {
+                            Text("✓ \(short)  백업 완료")
+                                .font(.footnote)
+                                .foregroundColor(.accentColor)
+                        } else {
+                            Text("⛔ \(short)  백업 불가\(r.error.map { " — \($0)" } ?? "")")
+                                .font(.footnote)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let err = wallet.uiState.backupError {
                 ErrorLine(message: err)

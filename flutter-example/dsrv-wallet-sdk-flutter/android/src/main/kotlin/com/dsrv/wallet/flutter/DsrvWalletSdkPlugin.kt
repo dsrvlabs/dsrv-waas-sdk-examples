@@ -118,7 +118,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 asset = parseAsset(call.arg("asset")),
                 recipient = call.arg("recipient"),
                 amount = call.arg("amount")
-            ).reply(result) { mapOf("txHash" to it.txHash) }
+            ).reply(result) { mapOf("txHash" to it.txHash, "status" to it.status) }
 
             "buildTx" -> DSRVWallet.buildTx(
                 address = call.arg("address"),
@@ -138,7 +138,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             "broadcastTx" -> DSRVWallet.broadcastTx(
                 address = call.arg("address"),
                 txId = call.arg("txId")
-            ).reply(result) { mapOf("txHash" to it.txHash) }
+            ).reply(result) { mapOf("txHash" to it.txHash, "status" to it.status) }
 
             "sign" -> DSRVWallet.sign(
                 address = call.arg("address"),
@@ -167,7 +167,8 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             "backup" -> {
                 val act = activity ?: return result.error(
                     "1001", "FragmentActivity 없음 (FlutterFragmentActivity 필요)", null)
-                DSRVWallet.backup(act).reply(result) { null }
+                DSRVWallet.backup(act)
+                    .reply(result) { list -> list.map { backupResultMap(it) } }
             }
 
             "restore" -> {
@@ -263,7 +264,10 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         "chainType" to c.chainType, "networkType" to c.networkType
     )
 
-    private fun restoredMap(r: com.dsrv.wallet.sdk.RestoredKey) =
+    private fun restoredMap(r: com.dsrv.wallet.sdk.RestoreResult) =
+        mapOf("address" to r.address, "success" to r.success, "error" to r.error)
+
+    private fun backupResultMap(r: com.dsrv.wallet.sdk.BackupResult) =
         mapOf("address" to r.address, "success" to r.success, "error" to r.error)
 
     private fun chainTxResultMap(r: com.dsrv.wallet.sdk.ChainTxResult) = mapOf(
@@ -271,6 +275,7 @@ class DsrvWalletSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         "outcome" to r.outcome,
         "txHash" to r.txHash,
         "errorMessage" to r.errorMessage,
+        "status" to r.status,
     )
 
     private fun chainSetupStatusMap(c: com.dsrv.wallet.sdk.ChainSetupStatus) = mapOf(

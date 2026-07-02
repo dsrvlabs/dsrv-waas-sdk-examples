@@ -29,6 +29,27 @@ class BackupSection extends StatelessWidget {
         ),
         if (wallet.backupResult != null)
           Text('✓ ${wallet.backupResult}', style: const TextStyle(fontSize: 12)),
+        // address 별 결과를 화면에 직접 표시 (성공 / stale 불가)
+        ...wallet.backupResults.map((r) {
+          final short =
+              r.address.length >= 12 ? '${r.address.substring(0, 12)}…' : r.address;
+          return Text(
+            r.success
+                ? '✓ $short  백업 완료'
+                : '⛔ $short  백업 불가${r.error != null ? ' — ${r.error}' : ''}',
+            style: TextStyle(
+              fontSize: 12,
+              color: r.success
+                  ? Theme.of(context).colorScheme.primary
+                  : errorColor,
+            ),
+          );
+        }),
+        if (wallet.backupError != null)
+          Text(
+            '⚠ ${wallet.backupError}',
+            style: TextStyle(fontSize: 12, color: errorColor),
+          ),
         const Divider(),
         Text('디버그', style: TextStyle(fontSize: 12, color: hint)),
         SizedBox(

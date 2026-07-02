@@ -26,6 +26,30 @@ class RestoreSection extends StatelessWidget {
         ),
         if (wallet.restoreResult != null)
           Text('✓ ${wallet.restoreResult}', style: const TextStyle(fontSize: 12)),
+        // address 별 복원 결과를 화면에 직접 표시 (성공 / 실패)
+        ...wallet.restoreResults.map((r) {
+          final short =
+              r.address.length >= 12 ? '${r.address.substring(0, 12)}…' : r.address;
+          return Text(
+            r.success
+                ? '✓ $short  복원 완료'
+                : '⛔ $short  복원 실패${r.error != null ? ' — ${r.error}' : ''}',
+            style: TextStyle(
+              fontSize: 12,
+              color: r.success
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.error,
+            ),
+          );
+        }),
+        if (wallet.restoreError != null)
+          Text(
+            '⚠ ${wallet.restoreError}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
       ],
     );
   }

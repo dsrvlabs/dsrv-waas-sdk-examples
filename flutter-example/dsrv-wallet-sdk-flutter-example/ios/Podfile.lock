@@ -1,5 +1,5 @@
 PODS:
-  - dsrv_wallet_sdk (0.9.3):
+  - dsrv_wallet_sdk (0.9.4):
     - Flutter
   - Flutter (1.0.0)
 
@@ -14,7 +14,7 @@ EXTERNAL SOURCES:
     :path: Flutter
 
 SPEC CHECKSUMS:
-  dsrv_wallet_sdk: df3e26dc8bdc927783329072cbae0af892e5f1d1
+  dsrv_wallet_sdk: 89e6fd2e7b00fd07e463ae25e52532e8b680c418
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
 
 PODFILE CHECKSUM: 91e09b640dc9dd2f4f089f66b631cc68af4da144

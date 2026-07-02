@@ -1,4 +1,5 @@
 import SwiftUI
+import dsrv_wallet_sdk_ios
 
 struct RestoreSection: View {
     @EnvironmentObject var wallet: Wallet
@@ -18,6 +19,24 @@ struct RestoreSection: View {
 
             if let result = wallet.uiState.restoreResult {
                 Text("✓ \(result)").font(.footnote)
+            }
+            // address 별 복원 결과를 화면에 직접 표시 (성공 / 실패)
+            if !wallet.uiState.restoreResults.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(wallet.uiState.restoreResults, id: \.address) { r in
+                        let short = r.address.count >= 12 ? String(r.address.prefix(12)) + "…" : r.address
+                        if r.success {
+                            Text("✓ \(short)  복원 완료")
+                                .font(.footnote)
+                                .foregroundColor(.accentColor)
+                        } else {
+                            Text("⛔ \(short)  복원 실패\(r.error.map { " — \($0)" } ?? "")")
+                                .font(.footnote)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let err = wallet.uiState.restoreError {
                 ErrorLine(message: err)

@@ -80,10 +80,22 @@ final broadcast = (await DSRVWallet.broadcastTx(
 await DSRVWallet.delegate(address: key.address);  // List<ChainTxResult>
 await DSRVWallet.revoke(address: key.address);
 // amount: 'MAX' = unbounded permit2 권한, '0' = 권한 해제. SDK 가 toUpperCase() 로 정규화.
-await DSRVWallet.approve(address: key.address, amount: 'MAX'); // List<ChainTxResult>
+await DSRVWallet.approve(address: key.address, amount: 'MAX'); // → List<ChainTxResult>
 
-await DSRVWallet.backup();                         // iCloud / Google Drive
-final restored = (await DSRVWallet.restore()).getOrThrow(); // List<RestoredKey>
+// 특정 address 의 chain 별 위임 (EIP-7702) + token 별 approve (Permit2) 상태 단건 조회.
+await DSRVWallet.getSetupStatus(
+  accountId: '<account-id>',
+  addressId: '<address-id>',
+); // → List<ChainSetupStatus> (each has delegated, approvals: List<TokenApproval>)
+
+// backup() — 디바이스의 모든 wallet share 를 cloud 에 sync. address 별 결과 리스트 반환.
+// 호출할 때마다 이미 백업된 wallet 도 재업로드 (의도된 동작, 'sync everything now' 의미).
+// 로컬 세대 < cloud 세대인 stale wallet 은 덮어쓰지 않고 success=false(사유 포함)로 skip.
+// 디바이스에 wallet 이 없으면 NoKeyShareToBackup (4204) 으로 실패 — createAddress()/restore() 먼저 안내.
+final backedUp = (await DSRVWallet.backup()).getOrThrow(); // List<BackupResult> (iCloud / Google Drive)
+// restore() — backup 의 대칭. 가져올 wallet 이 0개면 NoKeyShareToRestore (4205) 로 실패.
+// message 로 sub-case 구분: "No backup found in cloud." / "All wallets are already restored on this device."
+final restored = (await DSRVWallet.restore()).getOrThrow(); // List<RestoreResult>
 
 // 사용자 전환 — 다음 initialize() 가 다른 userCredential 로 새로 인증되게 함 (로컬 DB 유지)
 await DSRVWallet.reset();
@@ -107,7 +119,14 @@ class MyAuthHandler implements AuthHandler {
 
 ## 모델 / 에러
 
-- 모델: `KeyCreateResult`, `TxHashResult`, `TxBuildResult`, `SignResult`, `RestoredKey`, `AccountResult`, `AccountInfo`, `AddressInfo`, `ChainInfo`, `TransferAsset`
+- 모델: `KeyCreateResult`, `BroadcastResult`, `ChainTxResult`, `TxBuildResult`, `SignResult`, `BackupResult`, `RestoreResult`, `AccountResult`, `AccountInfo`, `AddressInfo` (`hasLocalKeyShare` 포함), `ChainSetupStatus`, `TokenApproval`, `ChainInfo`, `TransferAsset`
+- `ChainTxResult` — bulk operation 의 chain 별 결과 `(chainId, outcome, txHash?, errorMessage?, status?)`. `outcome` 값:
+  - `NEW` (delegate) / `BUILT` (approve) — 신규 빌드 + sign + submit **접수** 성공. `txHash` 는 GS_OFF 값 / **GS_ON(bundler) null** (batchTxId 로 추적), `status` 채워짐
+  - `RESUMED` (delegate) — 보관된 SIGNED 재사용 → 재 broadcast 접수 성공. `txHash` GS_OFF 값 / **GS_ON null**, `status` 채워짐
+  - `ALREADY_DELEGATED` / `SKIPPED` — 처리 불필요 (submit 없음), `txHash`/`status` null
+  - `FAILED` — 실패, `errorMessage` non-null, `txHash`/`status` null
+- `status` (broadcast 직후 서버 상태, 예 `BROADCAST`/`BATCHED`/`MINED_FAILED`) 는 SDK 가 해석하지 않고 원본을 그대로 전달 — 온체인 체결 성공/실패 판단은 앱 몫.
+- `isSuccess` getter 는 `outcome != 'FAILED'` 이므로 `ALREADY_DELEGATED` / `SKIPPED` 도 success 로 인정. **단 이는 broadcast 접수 성공까지만 의미하며 온체인 체결 성공이 아님** (`status`/indexer 로 판단). 일부 chain 만 실패해도 `WalletResult.success` 로 반환되므로 caller 가 각 entry 의 outcome 으로 분기해야 함.
 - 결과: `WalletResult<T>` (`getOrThrow`/`getOrNull`/`fold`/`onSuccess`/`onFailure`)
 - 에러: `WalletError(code, message)` — 코드 체계는 native 와 동일 (1001 notInitialized, 4201 backupFailed, 4301 delegationFailed, …)
 

@@ -48,6 +48,7 @@ struct WalletUiState {
     var backupLoading: Bool = false
     var backupError: String? = nil
     var backupResult: String? = nil
+    var backupResults: [BackupResult] = []
     var keychainDump: String? = nil
     var keychainDumpLoading: Bool = false
     var keychainClearLoading: Bool = false
@@ -56,6 +57,7 @@ struct WalletUiState {
     var restoreLoading: Bool = false
     var restoreError: String? = nil
     var restoreResult: String? = nil
+    var restoreResults: [RestoreResult] = []
 
     // Delegate / Revoke — chain 별 시도 결과 (성공/실패 모두 보존)
     var delegateLoading: Bool = false
@@ -780,15 +782,26 @@ final class Wallet: ObservableObject {
         uiState.backupLoading = true
         uiState.backupError = nil
         uiState.backupResult = nil
+        uiState.backupResults = []
         addLog("▶ backup()")
 
         Task {
             let result = await DSRVWallet.backup()
             uiState.backupLoading = false
             switch result {
-            case .success:
-                uiState.backupResult = "백업 완료"
-                addLog("✓ backup OK")
+            case .success(let list):
+                let ok = list.filter { $0.success }.count
+                let fail = list.count - ok
+                uiState.backupResult = "백업 완료 (성공 \(ok) · 불가 \(fail))"
+                uiState.backupResults = list
+                addLog("✓ backup OK — 성공 \(ok) / 불가 \(fail)")
+                for r in list {
+                    if r.success {
+                        addLog("  ✓ \(r.address.prefix(10))… 백업 완료")
+                    } else {
+                        addLog("  ⛔ \(r.address.prefix(10))… 백업 불가: \(r.error ?? "")")
+                    }
+                }
             case .failure(let error):
                 uiState.backupError = error.description
                 addLog("✗ backup FAILED: \(error.description)")
@@ -1114,6 +1127,7 @@ final class Wallet: ObservableObject {
         uiState.restoreLoading = true
         uiState.restoreError = nil
         uiState.restoreResult = nil
+        uiState.restoreResults = []
         addLog("▶ restore()")
 
         Task {
@@ -1124,6 +1138,7 @@ final class Wallet: ObservableObject {
                 let ok = restored.filter { $0.success }.count
                 let fail = restored.filter { !$0.success }.count
                 uiState.restoreResult = "복원 완료 (성공 \(ok) · 실패 \(fail))"
+                uiState.restoreResults = restored
                 addLog("✓ restore OK — 성공 \(ok) / 실패 \(fail)")
                 restored.filter { !$0.success }.forEach {
                     addLog("  ✗ \($0.address.prefix(10))…: \($0.error ?? "")")

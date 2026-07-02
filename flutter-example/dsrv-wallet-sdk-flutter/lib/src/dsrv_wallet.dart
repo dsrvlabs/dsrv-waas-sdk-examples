@@ -111,7 +111,7 @@ class DSRVWallet {
   /// 전송 원샷 (build hash → MPC sign → broadcast).
   ///
   /// [amount] 는 base units 의 10진 문자열 (Wei 등).
-  static Future<WalletResult<TxHashResult>> transfer({
+  static Future<WalletResult<BroadcastResult>> transfer({
     required String address,
     required String chainId,
     required TransferAsset asset,
@@ -126,7 +126,7 @@ class DSRVWallet {
         'recipient': recipient,
         'amount': amount,
       });
-      return TxHashResult.fromMap(map!);
+      return BroadcastResult.fromMap(map!);
     });
   }
 
@@ -155,7 +155,7 @@ class DSRVWallet {
   /// SIGNED 트랜잭션을 체인에 브로드캐스트 (transfer 단계별 흐름의 3단계).
   ///
   /// [txId] 는 [buildTx] 응답의 `txId` (broadcast 용 batch id).
-  static Future<WalletResult<TxHashResult>> broadcastTx({
+  static Future<WalletResult<BroadcastResult>> broadcastTx({
     required String address,
     required String txId,
   }) {
@@ -164,7 +164,7 @@ class DSRVWallet {
         'address': address,
         'txId': txId,
       });
-      return TxHashResult.fromMap(map!);
+      return BroadcastResult.fromMap(map!);
     });
   }
 
@@ -252,19 +252,23 @@ class DSRVWallet {
   }
 
   /// 보류 중인 keyShare 를 OS 클라우드(iCloud / Google Drive)에 백업.
-  static Future<WalletResult<void>> backup() {
+  /// address 별 성공/실패 리스트 반환 — 로컬 세대가 cloud 보다 낮으면 해당 address 는
+  /// success=false (stale) 로 skip 되고 나머지는 백업된다.
+  static Future<WalletResult<List<BackupResult>>> backup() {
     return _guard(() async {
-      await NativeBridge.invoke<void>('backup');
-      return null;
+      final list = await NativeBridge.invokeList('backup');
+      return (list ?? const [])
+          .map((e) => BackupResult.fromMap(e as Map))
+          .toList();
     });
   }
 
   /// OS 클라우드 백업에서 지갑 복원. 지갑별 성공/실패 리스트 반환.
-  static Future<WalletResult<List<RestoredKey>>> restore() {
+  static Future<WalletResult<List<RestoreResult>>> restore() {
     return _guard(() async {
       final list = await NativeBridge.invokeList('restore');
       return (list ?? const [])
-          .map((e) => RestoredKey.fromMap(e as Map))
+          .map((e) => RestoreResult.fromMap(e as Map))
           .toList();
     });
   }

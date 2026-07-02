@@ -1,6 +1,6 @@
 name: dsrv_wallet_sdk
 description: DSRV MPC Wallet SDK for Flutter
-version: 0.9.3
+version: 0.9.4
 homepage: https://dsrv.com
 
 environment:

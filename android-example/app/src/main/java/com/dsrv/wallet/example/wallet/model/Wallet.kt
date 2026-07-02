@@ -711,7 +711,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        uiState = uiState.copy(backupLoading = true, backupError = null, backupResult = null)
+        uiState = uiState.copy(backupLoading = true, backupError = null, backupResult = null, backupResults = emptyList())
         addLog("▶ backup (Google Drive + Passkey)")
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -719,8 +719,18 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) {
                 uiState = uiState.copy(backupLoading = false)
                 if (result.isSuccess) {
-                    uiState = uiState.copy(backupResult = "백업 완료")
-                    addLog("✓ backup OK")
+                    val list = result.getOrNull()!!
+                    val ok = list.count { it.success }
+                    val fail = list.count { !it.success }
+                    uiState = uiState.copy(
+                        backupResult = "백업 완료 (성공 $ok · 불가 $fail)",
+                        backupResults = list,
+                    )
+                    addLog("✓ backup OK — 성공 $ok / 불가 $fail")
+                    list.forEach {
+                        if (it.success) addLog("  ✓ ${it.address.take(10)}… 백업 완료")
+                        else addLog("  ⛔ ${it.address.take(10)}… 백업 불가: ${it.error}")
+                    }
                 } else {
                     val error = result.errorOrNull()
                     uiState = uiState.copy(backupError = error?.message ?: "백업 실패")
@@ -1061,7 +1071,7 @@ class Wallet(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        uiState = uiState.copy(restoreLoading = true, restoreError = null, restoreResult = null)
+        uiState = uiState.copy(restoreLoading = true, restoreError = null, restoreResult = null, restoreResults = emptyList())
         addLog("▶ restore (Google Drive + Passkey)")
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -1072,7 +1082,10 @@ class Wallet(application: Application) : AndroidViewModel(application) {
                     val list = result.getOrNull()!!
                     val ok = list.count { it.success }
                     val fail = list.count { !it.success }
-                    uiState = uiState.copy(restoreResult = "복원 완료 (성공 $ok · 실패 $fail)")
+                    uiState = uiState.copy(
+                        restoreResult = "복원 완료 (성공 $ok · 실패 $fail)",
+                        restoreResults = list,
+                    )
                     addLog("✓ restore OK — 성공 $ok / 실패 $fail")
                     list.filter { !it.success }.forEach {
                         addLog("  ✗ ${it.address.take(10)}…: ${it.error}")

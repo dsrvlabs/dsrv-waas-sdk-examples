@@ -154,7 +154,11 @@ class WalletState extends ChangeNotifier {
   PaymentResponse? paymentResult;
   String? paymentError;
   String? backupResult;
+  String? backupError;
+  List<BackupResult> backupResults = [];
   String? restoreResult;
+  String? restoreError;
+  List<RestoreResult> restoreResults = [];
   String? backupDump;
 
   final Set<String> _busy = {};
@@ -879,27 +883,50 @@ class WalletState extends ChangeNotifier {
   Future<void> backup() => _op('backup', () async {
         if (!initialized) return;
         backupResult = null;
+        backupError = null;
+        backupResults = [];
         _log('▶ backup');
         final r = await DSRVWallet.backup();
-        r.fold((_) {
-          backupResult = '백업 완료';
-          _log('✓ backup OK');
-        }, (e) => _log('✗ ${e.message}'));
+        r.fold((list) {
+          final ok = list.where((e) => e.success).length;
+          final fail = list.length - ok;
+          backupResult = '백업: 성공 $ok / 불가 $fail';
+          backupResults = list;
+          _log('✓ $backupResult');
+          for (final e in list) {
+            final short =
+                e.address.length >= 10 ? e.address.substring(0, 10) : e.address;
+            if (e.success) {
+              _log('  ✓ $short… 백업 완료');
+            } else {
+              _log('  ⛔ $short… 백업 불가: ${e.error}');
+            }
+          }
+        }, (e) {
+          backupError = e.message;
+          _log('✗ ${e.message}');
+        });
       });
 
   Future<void> restore() => _op('restore', () async {
         if (!initialized) return;
         restoreResult = null;
+        restoreError = null;
+        restoreResults = [];
         _log('▶ restore');
         final r = await DSRVWallet.restore();
         r.fold((list) {
           final ok = list.where((e) => e.success).length;
           final fail = list.length - ok;
           restoreResult = '복원: 성공 $ok / 실패 $fail';
+          restoreResults = list;
           _log('✓ $restoreResult');
           // 복원 후 계정 목록 새로고침
           getAccountList();
-        }, (e) => _log('✗ ${e.message}'));
+        }, (e) {
+          restoreError = e.message;
+          _log('✗ ${e.message}');
+        });
       });
 
   // ===== Debug =====
